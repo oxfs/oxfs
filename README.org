@@ -1,0 +1,21 @@
+* oxfs
+
+- A simple sftp filesystem with powerfull cache.
+
+* spacemacs
+
+  #+begin_src elisp
+  ;; (setq backup-directory-alist '(("" . "~/.emacs.d/backup")))
+  (setq make-backup-files nil) ; stop creating backup~ files
+  (setq auto-save-default nil) ; stop creating #autosave# files
+  (setq create-lockfiles nil)
+  #+end_src
+
+
+* vim
+
+  #+begin_src ascii
+  set nobackup       "no backup files
+  set nowritebackup  "only in case you don't want a backup file while editing
+  set noswapfile     "no swap files
+  #+end_src
