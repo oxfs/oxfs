@@ -5,10 +5,10 @@ from task_executor import Task, TaskExecutorService
 
 if '__main__' == __name__:
     pool = TaskExecutorService(3)
-    def myprint(msg):
+    def myprint(thread_local_data, msg):
         print(msg)
 
-    def mysleep(length, msg):
+    def mysleep(thread_local_data, length, msg):
         time.sleep(length)
         print(msg)
 
