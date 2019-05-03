@@ -80,14 +80,21 @@ class OXFS(LoggingMixIn, Operations):
         return dict((key, getattr(attr, key)) for key in (
             'st_atime', 'st_gid', 'st_mode', 'st_mtime', 'st_size', 'st_uid'))
 
-    def chmod(self, path, mode):
+    def _chmod(self, path, mode):
         self.logger.info('sftp chmod {}'.format(path))
-        os.chmod(self.cachefile(path), mode)
         with self.main_sftp_scope:
-            status = self.sftp.chmod(path, mode)
+            return self.sftp.chmod(path, mode)
 
-        self.attributes.remove(path)
-        return status
+    def chmod(self, path, mode):
+        cachefile = self.cachefile(path)
+        if os.path.exists(cachefile):
+            os.chmod(self.cachefile(path), mode)
+            self.attributes.insert(path, self.extract(os.lstat(cachefile)))
+            return self._chmod(path, mode)
+        else:
+            status = self._chmod(path, mode)
+            self.attributes.remove(path)
+            return status
 
     def chown(self, path, uid, gid):
         with self.main_sftp_scope:
@@ -142,7 +149,6 @@ class OXFS(LoggingMixIn, Operations):
 
         self.attributes.remove(path)
         self.directories.remove(os.path.dirname(path))
-        self.logger.info('after call mkdir')
         return status
 
     def read(self, path, size, offset, fh):
@@ -225,7 +231,6 @@ class OXFS(LoggingMixIn, Operations):
         self.logger.info('unlink {}'.format(path))
         os.unlink(self.cachefile(path))
         self.attributes.remove(path)
-        self.logger.info('attributes {}'.format(self.attributes))
         self.directories.remove(os.path.dirname(path))
         with self.main_sftp_scope:
             self.sftp.unlink(path)
@@ -247,7 +252,6 @@ class OXFS(LoggingMixIn, Operations):
                 outfile.seek(offset, 0)
                 outfile.write(data)
 
-        self.attributes.remove(path)
         return len(data)
 
     def write(self, path, data, offset, fh):
