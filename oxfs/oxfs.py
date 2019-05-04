@@ -272,31 +272,57 @@ class OXFS(LoggingMixIn, Operations):
         self.sftp.close()
         self.client.close()
 
+    def fuse_main(self, mount_point, foreground):
+        fuse = FUSE(self, mount_point, foreground=foreground,
+                    nothreads=True, allow_other=True)
+
 def main():
-    logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', dest='host')
-    parser.add_argument('-m', dest='mount_point')
-    parser.add_argument('-p', dest='cache_path')
+    parser.add_argument('-s', '--host', dest='host', help='ssh host (for example: root@127.0.0.0.1)')
+    parser.add_argument('-m', '--mount_point', dest='mount_point', help='mount point')
+    parser.add_argument('-p', '--cache_path', dest='cache_path', help='oxfs files cache path')
+    parser.add_argument('-l', '--logging', dest='logging', help='set log file, default: /tmp/oxfs.log')
+    parser.add_argument('-d', '--daemon', dest='daemon', action='store_true', help='run in background')
+    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='print verbose info')
     args = parser.parse_args()
 
+    loglevel = logging.WARN
+    if args.verbose:
+        loglevel = logging.INFO
+
+    formatter = '%(asctime)s:%(levelname)s:%(threadName)s:%(name)s:%(message)s'
+    if args.daemon:
+        daemon = True
+        logfile = '/tmp/oxfs.log'
+        if args.logging:
+            logfile = logging
+
+        logging.basicConfig(level=loglevel, format=formatter, filename=logfile)
+    else:
+        daemon = False
+        logging.basicConfig(level=loglevel, format=formatter)
+
     if not args.host:
+        parser.print_help()
         sys.exit()
     if not args.mount_point:
+        parser.print_help()
         sys.exit()
     if not args.cache_path:
+        parser.print_help()
         sys.exit()
 
     if '@' not in args.host:
-        logging.error('invalid host arguments.')
+        parser.print_help()
         sys.exit()
 
-    user, _, args.host = args.host.partition('@')
-    fuse = FUSE(OXFS(args.host, user=user, cache_path=args.cache_path),
-                args.mount_point,
-                foreground=True,
-                nothreads=True,
-                allow_other=True)
+    user, _, host = args.host.partition('@')
+    oxfs = OXFS(host, user=user, cache_path=args.cache_path)
+    if daemon:
+        # bugly, hangs
+        oxfs.fuse_main(args.mount_point, False)
+    else:
+        oxfs.fuse_main(args.mount_point, True)
 
 if __name__ == '__main__':
     main()

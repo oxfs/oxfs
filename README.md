@@ -1,51 +1,47 @@
 
 # Table of Contents
 
-1.  [oxfs](#org8a75fd8)
-    1.  [mount oxfs](#org4459aff)
-    2.  [suggest setting](#org688b047)
-        1.  [spacemacs](#org6be2793)
-        2.  [vim](#org62f2338)
+1.  [oxfs](#org3b9f42a)
+    1.  [mount](#orga05af0b)
+    2.  [setting](#org5cb9dd6)
+        1.  [spacemacs](#orga8cf891)
+        2.  [vim](#org24ce34a)
 
 
-<a id="org8a75fd8"></a>
+<a id="org3b9f42a"></a>
 
 # oxfs
 
 -   A simple sftp filesystem with powerfull cache.
 
 
-<a id="org4459aff"></a>
+<a id="orga05af0b"></a>
 
-## mount oxfs
+## mount
 
-```
-    $ sudo python3 oxfs.py -s user@xxx.xxx.xxx.xxx -m mount -p /tmp/oxfs
-```
-
-<a id="org688b047"></a>
-
-## suggest setting
+    $ mkdir remote
+    $ oxfs -s user@xxx.xxx.xxx.xxx -m remote -p /tmp/oxfs
 
 
-<a id="org6be2793"></a>
+<a id="org5cb9dd6"></a>
+
+## setting
+
+
+<a id="orga8cf891"></a>
 
 ### spacemacs
 
-```elisp
     (setq make-backup-files nil) ; stop creating backup~ files
     (setq auto-save-default nil) ; stop creating #autosave# files
     (setq create-lockfiles nil)
-```
 
 
-<a id="org62f2338"></a>
+<a id="org24ce34a"></a>
 
 ### vim
 
-```vim
     set nobackup       "no backup files
     set nowritebackup  "only in case you don't want a backup file while editing
     set noswapfile     "no swap files
-```
 

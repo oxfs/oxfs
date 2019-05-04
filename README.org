@@ -2,13 +2,14 @@
 
   - A simple sftp filesystem with powerfull cache.
 
-** mount oxfs
+** mount
 
    #+begin_src bash
-   $ sudo python3 oxfs.py -s user@xxx.xxx.xxx.xxx -m mount -p /tmp/oxfs
+   $ mkdir remote
+   $ oxfs -s user@xxx.xxx.xxx.xxx -m remote -p /tmp/oxfs
    #+end_src
 
-** suggest setting
+** setting
 
 *** spacemacs
 
