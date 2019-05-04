@@ -8,9 +8,10 @@ import paramiko
 import threading
 
 from errno import ENOENT
-from cache import MemoryCache
-from task_executor import Task, TaskExecutorService
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+
+from oxfs.cache import MemoryCache
+from oxfs.task_executor import TaskExecutorService, Task
 
 class OXFS(LoggingMixIn, Operations):
     '''
@@ -271,8 +272,7 @@ class OXFS(LoggingMixIn, Operations):
         self.sftp.close()
         self.client.close()
 
-
-if __name__ == '__main__':
+def main():
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', dest='host')
@@ -297,3 +297,6 @@ if __name__ == '__main__':
                 foreground=True,
                 nothreads=True,
                 allow_other=True)
+
+if __name__ == '__main__':
+    main()
