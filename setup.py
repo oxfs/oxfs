@@ -8,10 +8,10 @@ setup(
     version='0.0.1',
     author='RainMark',
     author_email='rain.by.zhou@gmail.com',
-    description='A simple and powerfull sftp filesystem.',
+    description='A simple and powerful sftp filesystem.',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/pypa/sampleproject',
+    url='https://github.com/RainMark/oxfs',
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',

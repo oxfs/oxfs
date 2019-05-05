@@ -1,6 +1,6 @@
 * oxfs
 
-  - A simple sftp filesystem with powerfull cache.
+  - A simple sftp filesystem with powerful cache.
 
 ** mount
 
@@ -11,7 +11,15 @@
 
 ** setting
 
-*** spacemacs
+*** vim
+
+    #+begin_src ascii
+    set nobackup       "no backup files
+    set nowritebackup  "only in case you don't want a backup file while editing
+    set noswapfile     "no swap files
+    #+end_src
+
+*** emacs
 
     #+begin_src elisp
     (setq make-backup-files nil) ; stop creating backup~ files
@@ -20,10 +28,3 @@
     #+end_src
 
 
-*** vim
-
-    #+begin_src ascii
-    set nobackup       "no backup files
-    set nowritebackup  "only in case you don't want a backup file while editing
-    set noswapfile     "no swap files
-    #+end_src
