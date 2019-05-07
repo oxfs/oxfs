@@ -20,12 +20,13 @@ class OXFS(LoggingMixIn, Operations):
     You need to be able to login to remote host without entering a password.
     '''
 
-    def __init__(self, host, user, cache_path, port=22):
+    def __init__(self, host, user, cache_path, remote_path, port=22):
         self.logger = logging.getLogger('oxfs')
         self.host = host
         self.port = port
         self.user = user
         self.cache_path = cache_path
+        self.remote_path = os.path.normpath(remote_path)
         self.client, self.sftp = self.open_sftp()
         self.taskpool = TaskExecutorService(2)
         self.attributes = MemoryCache(prefix='attributes')
@@ -62,6 +63,9 @@ class OXFS(LoggingMixIn, Operations):
 
     def cachefile(self, path):
         return os.path.join(self.cache_path, xxhash.xxh64_hexdigest(path))
+
+    def remotepath(self, path):
+        return os.path.normpath(os.path.join(self.remote_path, path[1:]))
 
     def trylock(self, path):
         lockfile = self.cachefile(path) + '.lockfile'
@@ -100,6 +104,7 @@ class OXFS(LoggingMixIn, Operations):
         return self.sftp.chmod(path, mode)
 
     def chmod(self, path, mode):
+        path = self.remotepath(path)
         cachefile = self.cachefile(path)
         if os.path.exists(cachefile):
             os.chmod(self.cachefile(path), mode)
@@ -111,9 +116,11 @@ class OXFS(LoggingMixIn, Operations):
             return status
 
     def chown(self, path, uid, gid):
+        path = self.remotepath(path)
         return self.sftp.chown(path, uid, gid)
 
     def create(self, path, mode):
+        path = self.remotepath(path)
         self.logger.info('create {}'.format(path))
         cachefile = self.cachefile(path)
         open(cachefile, 'wb').close()
@@ -127,6 +134,7 @@ class OXFS(LoggingMixIn, Operations):
         return 0
 
     def getattr(self, path, fh=None):
+        path = self.remotepath(path)
         attr = self.attributes.fetch(path)
         if attr is not None:
             if 'filenotexist' == attr:
@@ -143,6 +151,7 @@ class OXFS(LoggingMixIn, Operations):
             raise FuseOSError(ENOENT)
 
     def mkdir(self, path, mode):
+        path = self.remotepath(path)
         self.logger.info('mkdir {}'.format(path))
         status = self.sftp.mkdir(path, mode)
         self.attributes.remove(path)
@@ -150,6 +159,7 @@ class OXFS(LoggingMixIn, Operations):
         return status
 
     def read(self, path, size, offset, fh):
+        path = self.remotepath(path)
         cachefile = self.cachefile(path)
         if os.path.exists(cachefile):
             with open(cachefile, 'rb') as infile:
@@ -163,6 +173,7 @@ class OXFS(LoggingMixIn, Operations):
             return infile.read(size)
 
     def readdir(self, path, fh=None):
+        path = self.remotepath(path)
         entries = self.directories.fetch(path)
         if entries is None:
             entries = self.sftp.listdir(path)
@@ -172,9 +183,11 @@ class OXFS(LoggingMixIn, Operations):
         return entries + ['.', '..']
 
     def readlink(self, path):
+        path = self.remotepath(path)
         return self.sftp.readlink(path)
 
     def rename(self, old, new):
+        path = self.remotepath(path)
         self.logger.info('sftp rename {} {}'.format(old, new))
         status = self.sftp.rename(old, new)
         self.attributes.remove(old)
@@ -193,6 +206,7 @@ class OXFS(LoggingMixIn, Operations):
         return status
 
     def rmdir(self, path):
+        path = self.remotepath(path)
         self.logger.info('rmdir {}'.format(path))
         status = self.sftp.rmdir(path)
         self.attributes.remove(path)
@@ -200,6 +214,7 @@ class OXFS(LoggingMixIn, Operations):
         return status
 
     def symlink(self, target, source):
+        path = self.remotepath(path)
         'creates a symlink `target -> source` (e.g. ln -sf source target)'
         self.logger.info('sftp symlink {} {}'.format(source, target))
         self.sftp.symlink(source, target)
@@ -213,6 +228,7 @@ class OXFS(LoggingMixIn, Operations):
         return sftp.truncate(path, length)
 
     def truncate(self, path, length, fh=None):
+        path = self.remotepath(path)
         self.logger.info('truncate {}'.format(path))
         cachefile = self.cachefile(path)
         if not os.path.exists(cachefile):
@@ -226,6 +242,7 @@ class OXFS(LoggingMixIn, Operations):
         return status
 
     def unlink(self, path):
+        path = self.remotepath(path)
         self.logger.info('unlink {}'.format(path))
         cachefile = self.cachefile(path)
         if os.path.exists(cachefile):
@@ -237,6 +254,7 @@ class OXFS(LoggingMixIn, Operations):
         return 0
 
     def utimens(self, path, times=None):
+        path = self.remotepath(path)
         self.logger.info('utimens {}'.format(path))
         status = self.sftp.utime(path, times)
         self.attributes.remove(path)
@@ -252,6 +270,7 @@ class OXFS(LoggingMixIn, Operations):
         return len(data)
 
     def write(self, path, data, offset, fh):
+        path = self.remotepath(path)
         self.logger.info('write : {}'.format(data))
         cachefile = self.cachefile(path)
         if not os.path.exists(cachefile):
@@ -280,6 +299,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--host', dest='host', help='ssh host (for example: root@127.0.0.0.1)')
     parser.add_argument('-m', '--mount_point', dest='mount_point', help='mount point')
+    parser.add_argument('-r', '--remote_path', dest='remote_path', help='remote path, default: /')
     parser.add_argument('-p', '--cache_path', dest='cache_path', help='oxfs files cache path')
     parser.add_argument('-l', '--logging', dest='logging', help='set log file, default: /tmp/oxfs.log')
     parser.add_argument('-d', '--daemon', dest='daemon', action='store_true', help='run in background')
@@ -316,8 +336,14 @@ def main():
         parser.print_help()
         sys.exit()
 
+    remote_path = '/'
+    if args.remote_path:
+        remote_path = args.remote_path
+
     user, _, host = args.host.partition('@')
-    oxfs = OXFS(host, user=user, cache_path=args.cache_path)
+    oxfs = OXFS(host, user=user,
+                cache_path=args.cache_path,
+                remote_path=remote_path)
     if daemon:
         # bugly, hangs
         oxfs.fuse_main(args.mount_point, False)

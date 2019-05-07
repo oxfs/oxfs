@@ -5,7 +5,7 @@ with open('README.md', 'r') as inf:
 
 setup(
     name='oxfs',
-    version='0.0.1',
+    version='0.0.2',
     author='RainMark',
     author_email='rain.by.zhou@gmail.com',
     description='A simple and powerful sftp filesystem.',
@@ -13,9 +13,13 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/RainMark/oxfs',
     classifiers=[
-        'Programming Language :: Python :: 3',
+        'Environment :: MacOS X',
+        'Environment :: X11 Applications',
+        'Programming Language :: Python :: 3 :: Only',
+        'Operating System :: MacOS',
+        'Operating System :: POSIX :: Linux',
+        'Operating System :: Unix',
         'License :: OSI Approved :: MIT License',
-        'Operating System :: OS Independent',
     ],
 
     # packages= ['oxfs']
@@ -23,7 +27,8 @@ setup(
     include_package_data=True,
     zip_safe=True,
     install_requires = [
-        'paramiko >= 2.4.2',
+        'fusepy == 3.0.1',
+        'paramiko >= 2.0.0',
         'xxhash >= 1.3.0',
     ],
 
