@@ -190,6 +190,7 @@ class OXFS(LoggingMixIn, Operations):
         path = self.remotepath(path)
         self.logger.info('sftp rename {} {}'.format(old, new))
         status = self.sftp.rename(old, new)
+        self.logger.info('sftp rename status: {}'.format(status))
         self.attributes.remove(old)
         self.attributes.remove(new)
         self.directories.remove(os.path.dirname(old))
@@ -271,7 +272,7 @@ class OXFS(LoggingMixIn, Operations):
 
     def write(self, path, data, offset, fh):
         path = self.remotepath(path)
-        self.logger.info('write : {}'.format(data))
+        self.logger.info('write {} bytes to {}'.format(len(data), path))
         cachefile = self.cachefile(path)
         if not os.path.exists(cachefile):
             raise FuseOSError(ENOENT)

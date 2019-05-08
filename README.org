@@ -1,8 +1,9 @@
 * oxfs
 
-  - A simple sftp filesystem with powerful cache.
+- oxfs is a network file system, like sshfs.
+- it is very fast to look up remote files.
 
-** mount
+** usage
 
    #+begin_src bash
    $ oxfs --help
@@ -26,23 +27,3 @@
    $ mkdir remote
    $ oxfs -s user@xxx.xxx.xxx.xxx -m remote -r /home/oxfs -p /tmp/oxfs
    #+end_src
-
-** setting
-
-*** vim
-
-    #+begin_src ascii
-    set nobackup       "no backup files
-    set nowritebackup  "only in case you don't want a backup file while editing
-    set noswapfile     "no swap files
-    #+end_src
-
-*** emacs
-
-    #+begin_src elisp
-    (setq make-backup-files nil) ; stop creating backup~ files
-    (setq auto-save-default nil) ; stop creating #autosave# files
-    (setq create-lockfiles nil)
-    #+end_src
-
-
