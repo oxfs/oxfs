@@ -5,7 +5,7 @@ with open('README.md', 'r') as inf:
 
 setup(
     name='oxfs',
-    version='0.0.3',
+    version='0.0.4',
     author='RainMark',
     author_email='rain.by.zhou@gmail.com',
     description='A simple and powerful sftp filesystem.',

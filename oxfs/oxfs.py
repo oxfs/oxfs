@@ -13,6 +13,14 @@ from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 from oxfs.cache import MemoryCache
 from oxfs.task_executor import TaskExecutorService, Task
 
+def synchronized(func):
+    func.__lock__ = threading.Lock()
+    def synced_func(*args, **kws):
+        with func.__lock__:
+            return func(*args, **kws)
+
+    return synced_func
+
 class OXFS(LoggingMixIn, Operations):
     '''
     A simple sftp filesystem with powerfull cache. Requires paramiko: http://www.lag.net/paramiko/
@@ -67,6 +75,7 @@ class OXFS(LoggingMixIn, Operations):
     def remotepath(self, path):
         return os.path.normpath(os.path.join(self.remote_path, path[1:]))
 
+    @synchronized
     def trylock(self, path):
         lockfile = self.cachefile(path) + '.lockfile'
         if os.path.exists(lockfile):
@@ -74,6 +83,7 @@ class OXFS(LoggingMixIn, Operations):
         open(lockfile, 'wb').close()
         return True
 
+    @synchronized
     def unlock(self, path):
         lockfile = self.cachefile(path) + '.lockfile'
         os.remove(lockfile)
