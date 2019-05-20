@@ -197,7 +197,8 @@ class OXFS(LoggingMixIn, Operations):
         return self.sftp.readlink(path)
 
     def rename(self, old, new):
-        path = self.remotepath(path)
+        old = self.remotepath(old)
+        new = self.remotepath(new)
         self.logger.info('sftp rename {} {}'.format(old, new))
         status = self.sftp.rename(old, new)
         self.logger.info('sftp rename status: {}'.format(status))
@@ -225,7 +226,8 @@ class OXFS(LoggingMixIn, Operations):
         return status
 
     def symlink(self, target, source):
-        path = self.remotepath(path)
+        target = self.remotepath(target)
+        source = self.remotepath(source)
         'creates a symlink `target -> source` (e.g. ln -sf source target)'
         self.logger.info('sftp symlink {} {}'.format(source, target))
         self.sftp.symlink(source, target)
@@ -308,7 +310,7 @@ class OXFS(LoggingMixIn, Operations):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--host', dest='host', help='ssh host (for example: root@127.0.0.0.1)')
+    parser.add_argument('-s', '--host', dest='host', help='ssh host (for example: root@127.0.0.1)')
     parser.add_argument('-m', '--mount_point', dest='mount_point', help='mount point')
     parser.add_argument('-r', '--remote_path', dest='remote_path', help='remote path, default: /')
     parser.add_argument('-p', '--cache_path', dest='cache_path', help='oxfs files cache path')

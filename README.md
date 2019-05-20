@@ -1,11 +1,11 @@
 
 # Table of Contents
 
-1.  [oxfs](#org3117467)
-    1.  [usage](#orgdb8a16b)
+1.  [oxfs](#orgd85cbd7)
+    1.  [usage](#org716fcd5)
 
 
-<a id="org3117467"></a>
+<a id="orgd85cbd7"></a>
 
 # oxfs
 
@@ -13,7 +13,7 @@
 -   it is very fast to look up remote files.
 
 
-<a id="orgdb8a16b"></a>
+<a id="org716fcd5"></a>
 
 ## usage
 
@@ -23,7 +23,7 @@
     
      optional arguments:
        -h, --help            show this help message and exit
-       -s HOST, --host HOST  ssh host (for example: root@127.0.0.0.1)
+       -s HOST, --host HOST  ssh host (for example: root@127.0.0.1)
        -m MOUNT_POINT, --mount_point MOUNT_POINT
                              mount point
        -r REMOTE_PATH, --remote_path REMOTE_PATH

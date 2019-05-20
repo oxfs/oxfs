@@ -12,7 +12,7 @@
 
     optional arguments:
       -h, --help            show this help message and exit
-      -s HOST, --host HOST  ssh host (for example: root@127.0.0.0.1)
+      -s HOST, --host HOST  ssh host (for example: root@127.0.0.1)
       -m MOUNT_POINT, --mount_point MOUNT_POINT
                             mount point
       -r REMOTE_PATH, --remote_path REMOTE_PATH
