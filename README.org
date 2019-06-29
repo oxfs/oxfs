@@ -10,3 +10,20 @@
    $ mkdir remote
    $ sudo oxfs -s user@xxx.xxx.xxx.xxx -m remote -r /home/oxfs -p /tmp/oxfs
    #+end_src
+
+** Performance
+
+   #+begin_src bash
+   $ git clone https://github.com/RainMark/oxfs.git
+   $ cd oxfs/oxfs/benchmark
+   $ mkdir /tmp/oxfs_benchmark
+   $ # sshfs
+   $ ./sshfs-test.sh xxx.xxx.xxx.xxx root /root/oxfs /tmp/oxfs_benchmark 2
+   $ # oxfs
+   $ ./oxfs-test.sh xxx.xxx.xxx.xxx root /root/oxfs /tmp/oxfs_benchmark 2
+   #+end_src
+
+   | loop | sshfs | oxfs |
+   |-------+-------+-----|
+   | 1 | > 10s  |  < 10s |
+   | 2 | > 20s  |  < 10s |
