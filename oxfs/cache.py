@@ -13,3 +13,13 @@ class MemoryCache(object):
 
     def insert(self, k, v):
         self.cache[k] = v
+
+    def append_value(self, k, v):
+        if self.cache.get(k, None) is not None:
+            self.cache[k].append(v)
+        else:
+            self.cache[k] = [v]
+
+    def pop_value(self, k, v):
+        if self.cache.get(k, None) is not None:
+            self.cache[k].remove(v)

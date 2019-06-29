@@ -19,11 +19,13 @@ class TaskExecutor(object):
     def __init__(self):
         self.local_data = dict()
         self.queue = Queue()
+        self.empty = threading.Event()
         self.running = True
         self.thread = threading.Thread(target=self.loop, args=())
         self.thread.start()
 
     def submit(self, task):
+        self.empty.clear()
         self.queue.put(task)
 
     def loop(self):
@@ -33,6 +35,7 @@ class TaskExecutor(object):
             while not self.queue.empty():
                 task = self.queue.get()
                 task.execute(self.local_data)
+            self.empty.set()
 
     def join(self):
         self.thread.join()
@@ -46,6 +49,9 @@ class TaskExecutor(object):
     def shutdown(self):
         task = Task(0, self._shutdown)
         self.submit(task)
+
+    def wait(self):
+        self.empty.wait()
 
 class TaskExecutorService(object):
     def __init__(self, max_workers):
@@ -61,3 +67,7 @@ class TaskExecutorService(object):
     def shutdown(self):
         for worker in self.workers:
             worker.shutdown()
+
+    def wait(self, taskid):
+        worker = self.workers[taskid % self.max_workers]
+        worker.wait()

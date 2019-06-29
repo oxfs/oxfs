@@ -1,14 +1,22 @@
 from setuptools import setup, find_packages
 
-with open('README.md', 'r') as inf:
-    long_description = inf.read()
+long_description = '''
+### Oxfs
+
+- Oxfs is a network file system like sshfs.
+- It is very fast to edit remote files with desktop software.
+
+### Get Start
+
+- https://github.com/RainMark/oxfs
+'''
 
 setup(
     name='oxfs',
     version='0.0.5',
     author='RainMark',
     author_email='rain.by.zhou@gmail.com',
-    description='A simple and powerful sftp filesystem.',
+    description='A Fast SFTP File System',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/RainMark/oxfs',
@@ -22,7 +30,6 @@ setup(
         'License :: OSI Approved :: MIT License',
     ],
 
-    # packages= ['oxfs']
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,

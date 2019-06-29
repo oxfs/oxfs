@@ -23,7 +23,7 @@ def synchronized(func):
 
 class OXFS(LoggingMixIn, Operations):
     '''
-    A simple sftp filesystem with powerfull cache. Requires paramiko: http://www.lag.net/paramiko/
+    A Fast SFTP File System. Requires paramiko: http://www.lag.net/paramiko/
 
     You need to be able to login to remote host without entering a password.
     '''
@@ -74,6 +74,9 @@ class OXFS(LoggingMixIn, Operations):
 
     def remotepath(self, path):
         return os.path.normpath(os.path.join(self.remote_path, path[1:]))
+
+    def localpath(self, path):
+        return path[len(self.remote_path):]
 
     @synchronized
     def trylock(self, path):
@@ -199,22 +202,18 @@ class OXFS(LoggingMixIn, Operations):
     def rename(self, old, new):
         old = self.remotepath(old)
         new = self.remotepath(new)
-        self.logger.info('sftp rename {} {}'.format(old, new))
+        self.taskpool.wait(xxhash.xxh64(old).intdigest())
+        try:
+            self.unlink(self.localpath(new))
+        except Exception as e:
+            self.logger.debug(e)
+
+        self.logger.info('rename {} {}'.format(old, new))
         status = self.sftp.rename(old, new)
-        self.logger.info('sftp rename status: {}'.format(status))
         self.attributes.remove(old)
         self.attributes.remove(new)
         self.directories.remove(os.path.dirname(old))
         self.directories.remove(os.path.dirname(new))
-
-        cachefile = self.cachefile(old)
-        if os.path.exists(cachefile):
-            os.unlink(cachefile)
-
-        cachefile = self.cachefile(new)
-        if os.path.exists(cachefile):
-            os.unlink(cachefile)
-
         return status
 
     def rmdir(self, path):
