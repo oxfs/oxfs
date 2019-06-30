@@ -14,16 +14,17 @@
 ** Performance
 
    #+begin_src bash
-   $ git clone https://github.com/RainMark/oxfs.git
-   $ cd oxfs/oxfs/benchmark
-   $ mkdir /tmp/oxfs_benchmark
-   $ # sshfs
-   $ ./sshfs-test.sh xxx.xxx.xxx.xxx root /root/oxfs /tmp/oxfs_benchmark 2
-   $ # oxfs
-   $ ./oxfs-test.sh xxx.xxx.xxx.xxx root /root/oxfs /tmp/oxfs_benchmark 2
+   $ iozone -R -b output.xls -p -c -r 1k -s 20m -l 1 -u 1
    #+end_src
 
-   | loop | sshfs | oxfs |
-   |-------+-------+-----|
-   | 1 | > 10s  |  < 10s |
-   | 2 | > 20s  |  < 10s |
+   - Sshfs iozone performance.
+
+   [[./benchmark/sshfs.png]]
+
+   - Oxfs iozone performance.
+
+   [[./benchmark/oxfs.png]]
+
+   - Oxfs vs Sshfs
+
+   [[./benchmark/oxfs-vs-sshfs.png]]

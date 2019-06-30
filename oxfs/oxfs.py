@@ -304,8 +304,9 @@ class OXFS(LoggingMixIn, Operations):
         self.client.close()
 
     def fuse_main(self, mount_point, foreground):
-        fuse = FUSE(self, mount_point, foreground=foreground,
-                    nothreads=True, allow_other=True)
+        self.__class__.__name__ = 'oxfs'
+        fuse = FUSE(self, mount_point, foreground=foreground, auto_unmount=True,
+                    nothreads=True, allow_other=True, auto_cache=True)
 
 def main():
     parser = argparse.ArgumentParser()
