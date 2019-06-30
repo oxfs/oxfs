@@ -13,20 +13,29 @@
 
 ** Performance
 
-   #+begin_src bash
+*** Environment
+
+    - VPS: BandwagonHost (SPECIAL 10G KVM PROMO V3 - LOS ANGELES - CN2)
+    - VPS Operating System: Centos 7 x86_64 bbr
+    - Host: Intel® Core™ i5-4210U CPU @ 1.70GHz × 4 , SSD 125.5 GB
+    - Host Operating System: Ubuntu 18.04.2 LTS x86_64 reno
+    - Ping Latency: 190 ms
+
+*** Method
+    #+begin_src bash
    $ iozone -R -b output.xls -p -c -r 1k -s 20m -l 1 -u 1
-   #+end_src
+    #+end_src
 
-   - Sshfs performance.
-     - Sshfs enable the kernel cache by default, that's why re-read is deadly fast.
+    - Oxfs vs Sshfs
 
-   [[./benchmark/sshfs.png]]
+    [[./benchmark/oxfs-vs-sshfs.png]]
 
-   - Oxfs performance.
-     - Oxfs just enable the fuse auto_cache flag.
+    - Sshfs performance (default parameters).
+      - Sshfs enable the kernel cache by default, that's why re-read is deadly fast.
 
-   [[./benchmark/oxfs.png]]
+    [[./benchmark/sshfs.png]]
 
-   - Oxfs vs Sshfs
+    - Oxfs performance (default parameters).
+      - Oxfs just enable the fuse auto_cache flag.
 
-   [[./benchmark/oxfs-vs-sshfs.png]]
+    [[./benchmark/oxfs.png]]
