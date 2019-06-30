@@ -17,11 +17,13 @@
    $ iozone -R -b output.xls -p -c -r 1k -s 20m -l 1 -u 1
    #+end_src
 
-   - Sshfs iozone performance.
+   - Sshfs performance.
+     - Sshfs enable the kernel cache by default, that's why re-read is deadly fast.
 
    [[./benchmark/sshfs.png]]
 
-   - Oxfs iozone performance.
+   - Oxfs performance.
+     - Oxfs just enable the fuse auto_cache flag.
 
    [[./benchmark/oxfs.png]]
 
