@@ -1,15 +1,59 @@
 * Oxfs
 
   - Oxfs is a network file system like sshfs.
-  - It is very fast to edit remote files with desktop software.
+  - It is fast to edit remote files with desktop software.
 
-** Get start
+** Get Started
 
-   #+begin_src bash
-   $ pip install oxfs
+*** Ubuntu
+
+    #+begin_src bash
+   $ # Setup
+   $ sudo apt-get install python3.7
+   $ python3.7 -m pip install oxfs --user
+
+   $ # Run Oxfs
    $ mkdir remote
    $ sudo oxfs -s user@xxx.xxx.xxx.xxx -m remote -r /home/oxfs -p /tmp/oxfs
-   #+end_src
+    #+end_src
+
+*** Darwin
+
+    #+begin_src bash
+   $ # Setup
+   $ brew install python3
+   $ mkdir ~/.venv
+   $ python3 -m venv ~/.venv/oxfs
+   $ source ~/.venv/oxfs/bin/activate
+   $ pip install oxfs
+
+   $ # Run Oxfs
+   $ mkdir remote
+   $ sudo oxfs -s user@xxx.xxx.xxx.xxx -m remote -r /home/oxfs -p /tmp/oxfs
+    #+end_src
+
+*** Parameters
+
+    #+begin_src bash
+   $ oxfs --help
+   usage: oxfs [-h] [-s HOST] [-m MOUNT_POINT] [-r REMOTE_PATH] [-p CACHE_PATH]
+               [-l LOGGING] [-d] [-v]
+
+   optional arguments:
+     -h, --help            show this help message and exit
+     -s HOST, --host HOST  ssh host (for example: root@127.0.0.1)
+     -m MOUNT_POINT, --mount_point MOUNT_POINT
+                           mount point
+     -r REMOTE_PATH, --remote_path REMOTE_PATH
+                           remote path, default: /
+     -p CACHE_PATH, --cache_path CACHE_PATH
+                           oxfs files cache path
+     -l LOGGING, --logging LOGGING
+                           set log file, default: /tmp/oxfs.log
+     -d, --daemon          run in background
+     -v, --verbose         print verbose info
+    #+end_src
+
 
 ** Performance
 
@@ -39,3 +83,15 @@
       - Oxfs just enable the fuse auto_cache flag.
 
     [[./benchmark/oxfs.png]]
+
+** Changelog
+
+   - release/0.1.2
+     - [Removed] Remove auto_unmount fuse parameter, some osxfuse do not support it.
+     - [Deprecated] Disable the daemon parameter, turn on it in the future.
+
+   - release/0.1.1
+     - [Added] enable the auto_cache by default.
+
+   - release/0.1.0
+     - [Fixed] Fix the multi-thread bugs for rename operation.

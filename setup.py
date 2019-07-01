@@ -13,7 +13,7 @@ long_description = '''
 
 setup(
     name='oxfs',
-    version='0.1.1',
+    version='0.1.2',
     author='RainMark',
     author_email='rain.by.zhou@gmail.com',
     description='A Fast SFTP File System',

@@ -305,7 +305,10 @@ class OXFS(LoggingMixIn, Operations):
 
     def fuse_main(self, mount_point, foreground):
         self.__class__.__name__ = 'oxfs'
-        fuse = FUSE(self, mount_point, foreground=foreground, auto_unmount=True,
+        # fuse = FUSE(self, mount_point, foreground=foreground, auto_unmount=True,
+        #             nothreads=True, allow_other=True, auto_cache=True)
+        # Some version of OSXFUSE do not support auto_unmount
+        fuse = FUSE(self, mount_point, foreground=foreground,
                     nothreads=True, allow_other=True, auto_cache=True)
 
 def main():
@@ -325,6 +328,9 @@ def main():
 
     formatter = '%(asctime)s:%(levelname)s:%(threadName)s:%(name)s:%(message)s'
     if args.daemon:
+        logging.warn('BUG, do not enable daemon parameter.')
+        sys.exit()
+
         daemon = True
         logfile = '/tmp/oxfs.log'
         if args.logging:
@@ -359,7 +365,8 @@ def main():
                 remote_path=remote_path)
     if daemon:
         # bugly, hangs
-        oxfs.fuse_main(args.mount_point, False)
+        # oxfs.fuse_main(args.mount_point, False)
+        sys.exit()
     else:
         oxfs.fuse_main(args.mount_point, True)
 
