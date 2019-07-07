@@ -36,7 +36,7 @@ class OXFS(LoggingMixIn, Operations):
         self.cache_path = cache_path
         self.remote_path = os.path.normpath(remote_path)
         self.client, self.sftp = self.open_sftp()
-        self.taskpool = TaskExecutorService(2)
+        self.taskpool = TaskExecutorService(4)
         self.attributes = MemoryCache(prefix='attributes')
         self.directories = MemoryCache(prefix='directories')
 
@@ -92,18 +92,18 @@ class OXFS(LoggingMixIn, Operations):
         os.remove(lockfile)
 
     def getfile(self, thread_local_data, path):
+        cachefile = self.cachefile(path)
+        if os.path.exists(cachefile):
+            self.logger.info('exists, skip it. {}'.format(path))
+            return False
+
         if not self.trylock(path):
             self.logger.info('getfile lock failed {}'.format(path))
             return False
 
         self.logger.info('getfile {}'.format(path))
-        sftp = self.current_thread_sftp(thread_local_data)
-        cachefile = self.cachefile(path)
         tmpfile = cachefile + '.tmpfile'
-        with open(tmpfile, 'wb') as outfile:
-            with sftp.open(path, 'rb') as infile:
-                outfile.write(infile.read())
-
+        self.current_thread_sftp(thread_local_data).get(path, tmpfile)
         os.rename(tmpfile, cachefile)
         self.unlock(path)
         return True
