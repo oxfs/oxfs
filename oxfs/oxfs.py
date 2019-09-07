@@ -12,6 +12,7 @@ from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
 from oxfs.cache import MemoryCache
 from oxfs.task_executor import TaskExecutorService, Task
+from oxfs.apiserver import OxfsApi
 
 def synchronized(func):
     func.__lock__ = threading.Lock()
@@ -42,6 +43,10 @@ class OXFS(LoggingMixIn, Operations):
 
         if not os.path.exists(self.cache_path):
             os.makedirs(self.cache_path)
+
+    def start_apiserver(self):
+        self.apiserver = OxfsApi(self)
+        self.apiserver.run()
 
     def open_sftp(self):
         client = paramiko.SSHClient()
@@ -363,6 +368,7 @@ def main():
     oxfs = OXFS(host, user=user,
                 cache_path=args.cache_path,
                 remote_path=remote_path)
+    oxfs.start_apiserver()
     if daemon:
         # bugly, hangs
         # oxfs.fuse_main(args.mount_point, False)

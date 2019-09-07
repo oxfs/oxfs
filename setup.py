@@ -3,17 +3,24 @@ from setuptools import setup, find_packages
 long_description = '''
 ### Oxfs
 
-- Oxfs is a network file system like sshfs.
-- It is very fast to edit remote files with desktop software.
+Oxfs is a user-space network file system similar to SSHFS, and the underlying data transfer is based on the SFTP protocol.
+
+Oxfs introduces an asynchronous refresh policy to solve the jamming problem caused by the mismatch between network speed and user operation file speed.
+
+When Oxfs writes a file, it first writes to the local cache file and submits an asynchronous update task to update the content to the remote host.
+
+Similarly, when reading a file, it is preferred to read from a local cache file.
+
+Oxfs's data cache eventually falls to disk, and even if it is remounted, the history cache can still be used.
 
 ### Get Start
 
-- https://github.com/RainMark/oxfs
+- https://oxfs.io
 '''
 
 setup(
     name='oxfs',
-    version='0.1.3',
+    version='0.2.0',
     author='RainMark',
     author_email='rain.by.zhou@gmail.com',
     description='A Fast SFTP File System',
@@ -37,6 +44,7 @@ setup(
         'fusepy == 3.0.1',
         'paramiko >= 2.0.0',
         'xxhash >= 1.3.0',
+        'flask-restplus >= 0.12.1',
     ],
 
     entry_points={

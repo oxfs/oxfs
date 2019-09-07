@@ -1,7 +1,15 @@
 * Oxfs
 
-  - Oxfs is a network file system like sshfs.
-  - It is fast to edit remote files with desktop software.
+Oxfs is a user-space network file system similar to SSHFS, and the underlying data transfer is based on the SFTP protocol.
+
+Oxfs introduces an asynchronous refresh policy to solve the jamming problem caused by the mismatch between network speed and user operation file speed.
+
+When Oxfs writes a file, it first writes to the local cache file and submits an asynchronous update task to update the content to the remote host.
+
+Similarly, when reading a file, it is preferred to read from a local cache file.
+
+Oxfs's data cache eventually falls to disk, and even if it is remounted, the history cache can still be used.
+
 
 ** Get Started
 
@@ -85,6 +93,9 @@
     [[./benchmark/oxfs.png]]
 
 ** Changelog
+
+   - release/0.2.0
+     - [New] Add restful API to refresh the cache, default: htpp://127.0.0.1:10010 .
 
    - release/0.1.2
      - [Removed] Remove auto_unmount fuse parameter, some osxfuse do not support it.
