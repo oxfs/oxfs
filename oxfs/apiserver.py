@@ -22,12 +22,12 @@ class OxfsApi(object):
     def dump_directories(self, path):
         return True, json.dumps(self.oxfs_fuse.directories.fetch(path))
 
-    def run(self):
-        self.thread = threading.Thread(target=self.start_service)
+    def run(self, port):
+        self.thread = threading.Thread(target=self.start_service, args=(port,))
         self.thread.daemon = True
         self.thread.start()
 
-    def start_service(self):
+    def start_service(self, port):
         apiserver = self
         self.app = Flask(__name__)
         self.app.wsgi_app = ProxyFix(self.app.wsgi_app)
@@ -68,4 +68,4 @@ class OxfsApi(object):
                 status, data = apiserver.dump_directories(path)
                 return {'status': status, 'data': data}
 
-        self.app.run(port=10010)
+        self.app.run(port=port)

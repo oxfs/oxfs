@@ -44,9 +44,9 @@ class OXFS(LoggingMixIn, Operations):
         if not os.path.exists(self.cache_path):
             os.makedirs(self.cache_path)
 
-    def start_apiserver(self):
+    def start_apiserver(self, port):
         self.apiserver = OxfsApi(self)
-        self.apiserver.run()
+        self.apiserver.run(port)
 
     def open_sftp(self):
         client = paramiko.SSHClient()
@@ -319,9 +319,10 @@ class OXFS(LoggingMixIn, Operations):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--host', dest='host', help='ssh host (for example: root@127.0.0.1)')
+    parser.add_argument('-p', '--port', dest='port', type=int, help='oxfs apiserver port, default: 10010)')
     parser.add_argument('-m', '--mount_point', dest='mount_point', help='mount point')
     parser.add_argument('-r', '--remote_path', dest='remote_path', help='remote path, default: /')
-    parser.add_argument('-p', '--cache_path', dest='cache_path', help='oxfs files cache path')
+    parser.add_argument('-c', '--cache_path', dest='cache_path', help='oxfs files cache path')
     parser.add_argument('-l', '--logging', dest='logging', help='set log file, default: /tmp/oxfs.log')
     parser.add_argument('-d', '--daemon', dest='daemon', action='store_true', help='run in background')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='print verbose info')
@@ -356,6 +357,10 @@ def main():
         parser.print_help()
         sys.exit()
 
+    apiserver_port = 10010
+    if args.port:
+        apiserver_port = args.port
+
     if '@' not in args.host:
         parser.print_help()
         sys.exit()
@@ -368,7 +373,7 @@ def main():
     oxfs = OXFS(host, user=user,
                 cache_path=args.cache_path,
                 remote_path=remote_path)
-    oxfs.start_apiserver()
+    oxfs.start_apiserver(apiserver_port)
     if daemon:
         # bugly, hangs
         # oxfs.fuse_main(args.mount_point, False)
