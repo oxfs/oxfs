@@ -13,7 +13,7 @@ Oxfs is a user-space network file system similar to SSHFS, and the underlying da
 
    $ # Run Oxfs
    $ mkdir remote
-   $ sudo oxfs -s user@xxx.xxx.xxx.xxx -m remote -r /home/oxfs -p /tmp/oxfs
+   $ sudo oxfs -s user@xxx.xxx.xxx.xxx -m remote -r /home/oxfs -c /tmp/oxfs
     #+end_src
 
 *** Darwin
@@ -28,31 +28,27 @@ Oxfs is a user-space network file system similar to SSHFS, and the underlying da
 
    $ # Run Oxfs
    $ mkdir remote
-   $ sudo oxfs -s user@xxx.xxx.xxx.xxx -m remote -r /home/oxfs -p /tmp/oxfs
+   $ sudo oxfs -s user@xxx.xxx.xxx.xxx -m remote -r /home/oxfs -c /tmp/oxfs
     #+end_src
 
 *** Parameters
 
     #+begin_src bash
-   $ oxfs --help
-   usage: oxfs [-h] [-s HOST] [-m MOUNT_POINT] [-r REMOTE_PATH] [-p CACHE_PATH]
-               [-l LOGGING] [-d] [-v]
+      $ oxfs --help
+      usage: oxfs [-h] [-s HOST] [-p PORT] [-m MOUNT_POINT] [-r REMOTE_PATH]
+                  [-c CACHE_PATH] [-l LOGGING] [-d] [-v]
 
-   optional arguments:
-     -h, --help            show this help message and exit
-     -s HOST, --host HOST  ssh host (for example: root@127.0.0.1)
-     -m MOUNT_POINT, --mount_point MOUNT_POINT
-                           mount point
-     -r REMOTE_PATH, --remote_path REMOTE_PATH
-                           remote path, default: /
-     -p CACHE_PATH, --cache_path CACHE_PATH
-                           oxfs files cache path
-     -l LOGGING, --logging LOGGING
-                           set log file, default: /tmp/oxfs.log
-     -d, --daemon          run in background
-     -v, --verbose         print verbose info
+      optional arguments:
+        -h, --help            show this help message and exit
+        -s HOST, --host HOST  ssh host (for example: root@127.0.0.1)
+        -p PORT, --port PORT  oxfs apiserver port, default: 10010)
+        -m MOUNT_POINT, --mount_point MOUNT_POINT mount point
+        -r REMOTE_PATH, --remote_path REMOTE_PATH remote path, default: /
+        -c CACHE_PATH, --cache_path CACHE_PATH oxfs files cache path
+        -l LOGGING, --logging LOGGING set log file, default: /tmp/oxfs.log
+        -d, --daemon          run in background
+        -v, --verbose         print verbose info
     #+end_src
-
 
 ** Performance
 
@@ -86,7 +82,7 @@ Oxfs is a user-space network file system similar to SSHFS, and the underlying da
 ** Changelog
 
    - release/0.2.0
-     - [New] Add restful API to refresh the cache, default: htpp://127.0.0.1:10010 .
+     - [New] Add restful API to refresh the cache, default: http://127.0.0.1:10010 .
 
    - release/0.1.2
      - [Removed] Remove auto_unmount fuse parameter, some osxfuse do not support it.

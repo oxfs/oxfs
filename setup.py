@@ -20,12 +20,10 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/RainMark/oxfs',
     classifiers=[
-        'Environment :: MacOS X',
-        'Environment :: X11 Applications',
-        'Programming Language :: Python :: 3 :: Only',
+        'Operating System :: Unix',
         'Operating System :: MacOS',
         'Operating System :: POSIX :: Linux',
-        'Operating System :: Unix',
+        'Programming Language :: Python :: 3 :: Only',
         'License :: OSI Approved :: MIT License',
     ],
 
