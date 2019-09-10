@@ -1,33 +1,29 @@
 #!/usr/bin/env python
 
-import threading
-
 class MemoryCache(object):
+    '''
+    The mechanism used by the CPython interpreter to assure that only one thread executes Python bytecode at a time. This simplifies the CPython implementation by making the object model (including critical built-in types such as dict) implicitly safe against concurrent access.
+    See: https://docs.python.org/3/glossary.html#term-global-interpreter-lock
+    '''
     def __init__(self, prefix):
         self.prefix = prefix
         self.cache = dict()
-        self.lock_guard = threading.Lock()
 
     def remove(self, k):
-        with self.lock_guard:
-            self.cache.pop(k, None)
+        self.cache.pop(k, None)
 
     def fetch(self, k):
-        with self.lock_guard:
-            return self.cache.get(k, None)
+        return self.cache.get(k, None)
 
     def insert(self, k, v):
-        with self.lock_guard:
-            self.cache[k] = v
+        self.cache[k] = v
 
     def append_value(self, k, v):
-        with self.lock_guard:
-            if self.cache.get(k, None) is not None:
-                self.cache[k].append(v)
-            else:
-                self.cache[k] = [v]
+        if self.cache.get(k, None) is not None:
+            self.cache[k].append(v)
+        else:
+            self.cache[k] = [v, ]
 
     def pop_value(self, k, v):
-        with self.lock_guard:
-            if self.cache.get(k, None) is not None:
-                self.cache[k].remove(v)
+        if self.cache.get(k, None) is not None:
+            self.cache[k].remove(v)
