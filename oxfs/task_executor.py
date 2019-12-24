@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
+import logging
 import threading
 from queue import Queue
 
 class Task(object):
     def __init__(self, taskid, func, *args):
+        self.logger = logging.getLogger('task_executor')
         self.func = func
         self.args = args
         self.taskid = taskid
@@ -13,7 +15,11 @@ class Task(object):
         args = ()
         args += (local_data, )
         args += self.args
-        self.func(*args)
+        try:
+            self.func(*args)
+        except Exception as e:
+            self.logger.exception(e)
+
 
 class TaskExecutor(object):
     def __init__(self):
