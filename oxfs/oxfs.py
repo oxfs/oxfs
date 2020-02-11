@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
-import os, sys
-import logging
 import argparse
-import xxhash
+import logging
+import os
 import paramiko
-import threading
 import platform
+import sys
+import threading
+import time
+import xxhash
 
 from errno import ENOENT
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
@@ -22,6 +24,15 @@ def synchronized(func):
             return func(*args, **kws)
 
     return synced_func
+
+def reconnect(func):
+    def operation_func(*args, **kws):
+        oxfs = args[0]
+        if oxfs.disconnected:
+            oxfs.connect()
+        return func(*args, **kws)
+
+    return operation_func
 
 class OXFS(LoggingMixIn, Operations):
     '''
@@ -50,6 +61,26 @@ class OXFS(LoggingMixIn, Operations):
         self.apiserver = OxfsApi(self)
         self.apiserver.run(port)
 
+    def check(self):
+        while not self.checker_shutdown:
+            time.sleep(10)
+            try:
+                self.sftp.stat(self.remote_path)
+            except Exception as e:
+                self.logger.info('disconnected, {}'.format(str(e)))
+                self.disconnected = True
+                self.connect()
+
+    def start_checker(self):
+        self.disconnected = False
+        self.checker_shutdown = False
+        self.checker = threading.Thread(target=self.check, args=())
+        self.checker.start()
+
+    def shutdown_checker(self):
+        self.checker_shutdown = True
+        self.checker.join()
+
     def open_sftp(self):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -73,8 +104,25 @@ class OXFS(LoggingMixIn, Operations):
         client = thread_local_data.get('client')
         sftp = thread_local_data.get('sftp')
         if sftp is not None:
+            thread_local_data.pop('client')
+            thread_local_data.pop('sftp')
             sftp.close()
             client.close()
+
+    @synchronized
+    def connect(self):
+        if not self.disconnected:
+            return
+        try:
+            def clean_sftp(tls):
+                tls['client'] = tls['sftp'] = None
+
+            self.taskpool.for_each_tls(clean_sftp)
+            self.client, self.sftp = self.open_sftp()
+            self.disconnected = False
+        except Exception as e:
+            self.disconnected = True
+            self.logger.info('reconnect fail, {}'.format(str(e)))
 
     def cachefile(self, path):
         return os.path.join(self.cache_path, xxhash.xxh64_hexdigest(path))
@@ -98,6 +146,7 @@ class OXFS(LoggingMixIn, Operations):
         lockfile = self.cachefile(path) + '.lockfile'
         os.remove(lockfile)
 
+    @reconnect
     def getfile(self, thread_local_data, path):
         cachefile = self.cachefile(path)
         if os.path.exists(cachefile):
@@ -119,6 +168,7 @@ class OXFS(LoggingMixIn, Operations):
         return dict((key, getattr(attr, key)) for key in (
             'st_atime', 'st_gid', 'st_mode', 'st_mtime', 'st_size', 'st_uid'))
 
+    @reconnect
     def _chmod(self, path, mode):
         self.logger.info('sftp chmod {}, mode {}'.format(path, mode))
         return self.sftp.chmod(path, mode)
@@ -135,10 +185,12 @@ class OXFS(LoggingMixIn, Operations):
             self.attributes.remove(path)
             return status
 
+    @reconnect
     def chown(self, path, uid, gid):
         path = self.remotepath(path)
         return self.sftp.chown(path, uid, gid)
 
+    @reconnect
     def create(self, path, mode):
         path = self.remotepath(path)
         self.logger.info('create {}, ignore mode {}'.format(path, mode))
@@ -149,6 +201,7 @@ class OXFS(LoggingMixIn, Operations):
         self.directories.remove(os.path.dirname(path))
         return 0
 
+    @reconnect
     def getattr(self, path, fh=None):
         path = self.remotepath(path)
         attr = self.attributes.fetch(path)
@@ -162,10 +215,11 @@ class OXFS(LoggingMixIn, Operations):
             attr = self.extract(self.sftp.lstat(path))
             self.attributes.insert(path, attr)
             return attr
-        except:
+        except FileNotFoundError as e:
             self.attributes.insert(path, 'filenotexist')
             raise FuseOSError(ENOENT)
 
+    @reconnect
     def mkdir(self, path, mode):
         path = self.remotepath(path)
         self.logger.info('mkdir {}'.format(path))
@@ -174,6 +228,7 @@ class OXFS(LoggingMixIn, Operations):
         self.directories.remove(os.path.dirname(path))
         return status
 
+    @reconnect
     def read(self, path, size, offset, fh):
         path = self.remotepath(path)
         cachefile = self.cachefile(path)
@@ -188,6 +243,7 @@ class OXFS(LoggingMixIn, Operations):
             infile.seek(offset, 0)
             return infile.read(size)
 
+    @reconnect
     def readdir(self, path, fh=None):
         path = self.remotepath(path)
         entries = self.directories.fetch(path)
@@ -198,10 +254,12 @@ class OXFS(LoggingMixIn, Operations):
 
         return entries + ['.', '..']
 
+    @reconnect
     def readlink(self, path):
         path = self.remotepath(path)
         return self.sftp.readlink(path)
 
+    @reconnect
     def rename(self, old, new):
         old = self.remotepath(old)
         new = self.remotepath(new)
@@ -209,7 +267,7 @@ class OXFS(LoggingMixIn, Operations):
         self.taskpool.wait(xxhash.xxh64(old).intdigest())
         try:
             self.unlink(self.localpath(new))
-        except Exception as e:
+        except FileNotFoundError as e:
             self.logger.debug(e)
 
         status = self.sftp.rename(old, new)
@@ -219,6 +277,7 @@ class OXFS(LoggingMixIn, Operations):
         self.directories.remove(os.path.dirname(new))
         return status
 
+    @reconnect
     def rmdir(self, path):
         path = self.remotepath(path)
         self.logger.info('rmdir {}'.format(path))
@@ -227,6 +286,7 @@ class OXFS(LoggingMixIn, Operations):
         self.directories.remove(os.path.dirname(path))
         return status
 
+    @reconnect
     def symlink(self, target, source):
         target = self.remotepath(target)
         source = self.remotepath(source)
@@ -237,6 +297,7 @@ class OXFS(LoggingMixIn, Operations):
         self.directories.remove(os.path.dirname(target))
         return 0
 
+    @reconnect
     def _truncate(self, thread_local_data, path, length):
         self.logger.info('sftp truncate {}'.format(path))
         sftp = self.current_thread_sftp(thread_local_data)
@@ -256,6 +317,7 @@ class OXFS(LoggingMixIn, Operations):
         self.taskpool.submit(task)
         return status
 
+    @reconnect
     def unlink(self, path):
         path = self.remotepath(path)
         self.logger.info('unlink {}'.format(path))
@@ -268,6 +330,7 @@ class OXFS(LoggingMixIn, Operations):
         self.directories.remove(os.path.dirname(path))
         return 0
 
+    @reconnect
     def utimens(self, path, times=None):
         path = self.remotepath(path)
         self.logger.info('utimens {}'.format(path))
@@ -275,6 +338,7 @@ class OXFS(LoggingMixIn, Operations):
         self.attributes.remove(path)
         return status
 
+    @reconnect
     def _write(self, thread_local_data, path, data, offset):
         sftp = self.current_thread_sftp(thread_local_data)
         with sftp.open(path, 'rb+') as outfile:
@@ -299,7 +363,7 @@ class OXFS(LoggingMixIn, Operations):
         self.taskpool.submit(task)
         return len(data)
 
-    def destroy(self, path):
+    def destroy(self, path='/'):
         self.taskpool.shutdown()
         self.sftp.close()
         self.client.close()
@@ -377,6 +441,7 @@ def main():
                 cache_path=args.cache_path,
                 remote_path=remote_path)
     oxfs.start_apiserver(apiserver_port)
+    oxfs.start_checker()
     if daemon:
         # bugly, hangs
         # oxfs.fuse_main(args.mount_point, False)

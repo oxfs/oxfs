@@ -20,7 +20,6 @@ class Task(object):
         except Exception as e:
             self.logger.exception(e)
 
-
 class TaskExecutor(object):
     def __init__(self):
         self.local_data = dict()
@@ -77,3 +76,7 @@ class TaskExecutorService(object):
     def wait(self, taskid):
         worker = self.workers[taskid % self.max_workers]
         worker.wait()
+
+    def for_each_tls(self, mapper):
+        for worker in self.workers:
+            mapper(worker.local_data)
