@@ -321,14 +321,16 @@ class OXFS(LoggingMixIn, Operations):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--host', dest='host', help='ssh host (for example: root@127.0.0.1)')
-    parser.add_argument('-p', '--port', dest='port', type=int, help='oxfs apiserver port, default: 10010)')
-    parser.add_argument('-m', '--mount_point', dest='mount_point', help='mount point')
-    parser.add_argument('-r', '--remote_path', dest='remote_path', help='remote path, default: /')
-    parser.add_argument('-c', '--cache_path', dest='cache_path', help='oxfs files cache path')
-    parser.add_argument('-l', '--logging', dest='logging', help='set log file, default: /tmp/oxfs.log')
-    parser.add_argument('-d', '--daemon', dest='daemon', action='store_true', help='run in background')
-    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='print verbose info')
+    parser.add_argument('--host', dest='host', help='ssh host (for example: root@127.0.0.1)')
+    parser.add_argument('--ssh-port', dest='ssh_port', help='ssh port, defaut: 22')
+    parser.add_argument('--apiserver-port', dest='apiserver_port', type=int, help='apiserver port, default: 10010')
+    parser.add_argument('--mount-point', dest='mount_point', help='mount point')
+    parser.add_argument('--remote-path', dest='remote_path', help='remote path, default: /')
+    parser.add_argument('--cache-path', dest='cache_path', help='files cache path')
+    parser.add_argument('--daemon', dest='daemon', action='store_true', help='run in background')
+
+    parser.add_argument('-l', '--logging', dest='logging', help='log file, default: /tmp/oxfs.log')
+    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='debug info')
     args = parser.parse_args()
 
     loglevel = logging.WARN
@@ -360,9 +362,13 @@ def main():
         parser.print_help()
         sys.exit()
 
+    ssh_port = 22
+    if args.ssh_port:
+        ssh_port = args.ssh_port
+
     apiserver_port = 10010
-    if args.port:
-        apiserver_port = args.port
+    if args.apiserver_port:
+        apiserver_port = args.apiserver_port
 
     if '@' not in args.host:
         parser.print_help()
@@ -375,7 +381,7 @@ def main():
     user, _, host = args.host.partition('@')
     oxfs = OXFS(host, user=user,
                 cache_path=args.cache_path,
-                remote_path=remote_path)
+                remote_path=remote_path, port=ssh_port)
     oxfs.start_apiserver(apiserver_port)
     if daemon:
         # bugly, hangs
