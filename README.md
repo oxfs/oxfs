@@ -100,7 +100,7 @@ $ iozone -R -b output.xls -p -c -r 1k -s 20m -l 1 -u 1
 
 ### Changelog
 
-- release/0.2.1
+- release/0.3.0
   - [New] Add daemon support.
   - [New] Upgrade to flask-restx.
   - [Removed] Remove short argument.
