@@ -25,7 +25,7 @@ def synchronized(func):
 
 class OXFS(LoggingMixIn, Operations):
     '''
-    A Fast SFTP File System. Requires paramiko: http://www.lag.net/paramiko/
+    A dead simple, fast SFTP file system. Home: https://oxfs.io/
 
     You need to be able to login to remote host without entering a password.
     '''
@@ -153,7 +153,7 @@ class OXFS(LoggingMixIn, Operations):
         path = self.remotepath(path)
         attr = self.attributes.fetch(path)
         if attr is not None:
-            if 'filenotexist' == attr:
+            if ENOENT == attr:
                 raise FuseOSError(ENOENT)
             return attr
 
@@ -163,7 +163,7 @@ class OXFS(LoggingMixIn, Operations):
             self.attributes.insert(path, attr)
             return attr
         except:
-            self.attributes.insert(path, 'filenotexist')
+            self.attributes.insert(path, ENOENT)
             raise FuseOSError(ENOENT)
 
     def mkdir(self, path, mode):
@@ -243,16 +243,19 @@ class OXFS(LoggingMixIn, Operations):
         return sftp.truncate(path, length)
 
     def truncate(self, path, length, fh=None):
-        path = self.remotepath(path)
-        self.logger.info('truncate {}'.format(path))
-        cachefile = self.cachefile(path)
+        realpath = self.remotepath(path)
+        cachefile = self.cachefile(realpath)
         if not os.path.exists(cachefile):
-            raise FuseOSError(ENOENT)
+            if self.empty_file(realpath):
+                self.create(path, 'wb')
+            else:
+                raise FuseOSError(ENOENT)
 
         status = os.truncate(cachefile, length)
         self.logger.info(self.extract(os.lstat(cachefile)))
-        self.attributes.insert(path, self.extract(os.lstat(cachefile)))
-        task = Task(xxhash.xxh64(path).intdigest(), self._truncate, path, length)
+        self.attributes.insert(realpath, self.extract(os.lstat(cachefile)))
+        task = Task(xxhash.xxh64(realpath).intdigest(),
+                    self._truncate, realpath, length)
         self.taskpool.submit(task)
         return status
 
@@ -283,19 +286,26 @@ class OXFS(LoggingMixIn, Operations):
 
         return len(data)
 
+    def empty_file(self, path):
+        attr = self.attributes.fetch(path)
+        return 0 == attr['st_size']
+
     def write(self, path, data, offset, fh):
-        path = self.remotepath(path)
-        cachefile = self.cachefile(path)
+        realpath = self.remotepath(path)
+        cachefile = self.cachefile(realpath)
         if not os.path.exists(cachefile):
-            raise FuseOSError(ENOENT)
+            if self.empty_file(realpath):
+                self.create(path, 'wb')
+            else:
+                raise FuseOSError(ENOENT)
 
         with open(cachefile, 'rb+') as outfile:
             outfile.seek(offset, 0)
             outfile.write(data)
 
-        self.attributes.insert(path, self.extract(os.lstat(cachefile)))
-        task = Task(xxhash.xxh64(path).intdigest(),
-                    self._write, path, data, offset)
+        self.attributes.insert(realpath, self.extract(os.lstat(cachefile)))
+        task = Task(xxhash.xxh64(realpath).intdigest(),
+                    self._write, realpath, data, offset)
         self.taskpool.submit(task)
         return len(data)
 
@@ -304,53 +314,63 @@ class OXFS(LoggingMixIn, Operations):
         self.sftp.close()
         self.client.close()
 
-    def fuse_main(self, mount_point, foreground):
-        self.__class__.__name__ = 'Oxfs'
+    def fuse_main(self, mount_point):
+        self.__class__.__name__ = 'oxfs'
         if 'Darwin' == self.sys:
-            fuse = FUSE(self, mount_point, foreground=foreground,
-                        nothreads=True, allow_other=True, auto_cache=True,
+            fuse = FUSE(self, mount_point, foreground=True, nothreads=True,
+                        allow_other=True, auto_cache=True,
+                        uid=os.getuid(), gid=os.getgid(),
                         defer_permissions=True, kill_on_unmount=True,
-                        noappledouble=True, noapplexattr=True, nosuid=True,
-                        volname='Oxfs-{}-{}'.format(self.host, mount_point))
+                        noappledouble=True, noapplexattr=True,
+                        nosuid=True, nobrowse=True, volname=self.host)
         elif 'Linux' == self.sys:
-            fuse = FUSE(self, mount_point, foreground=foreground, auto_unmount=True,
-                        nothreads=True, allow_other=True, auto_cache=True)
+            fuse = FUSE(self, mount_point, foreground=True, nothreads=True,
+                        allow_other=True, auto_cache=True,
+                        uid=os.getuid(), gid=os.getgid(),
+                        auto_unmount=True)
         else:
             self.logger.error('not supported system, {}'.format(self.sys))
             sys.exit()
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--host', dest='host', help='ssh host (for example: root@127.0.0.1)')
-    parser.add_argument('--ssh-port', dest='ssh_port', help='ssh port, defaut: 22')
-    parser.add_argument('--apiserver-port', dest='apiserver_port', type=int, help='apiserver port, default: 10010')
-    parser.add_argument('--mount-point', dest='mount_point', help='mount point')
-    parser.add_argument('--remote-path', dest='remote_path', help='remote path, default: /')
-    parser.add_argument('--cache-path', dest='cache_path', help='files cache path')
-    parser.add_argument('--daemon', dest='daemon', action='store_true', help='run in background')
-
-    parser.add_argument('-l', '--logging', dest='logging', help='log file, default: /tmp/oxfs.log')
-    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='debug info')
+    parser.add_argument('--host', dest='host',
+                        help='ssh host (example: root@127.0.0.1)')
+    parser.add_argument('--ssh-port', dest='ssh_port', type=int,
+                        help='ssh port (defaut: 22)')
+    parser.add_argument('--apiserver-port', dest='apiserver_port', type=int,
+                        help='apiserver port (default: 10010)')
+    parser.add_argument('--mount-point', dest='mount_point',
+                        help='mount point')
+    parser.add_argument('--remote-path', dest='remote_path',
+                        help='remote path (default: /)')
+    parser.add_argument('--cache-path', dest='cache_path',
+                        help='cache path')
+    parser.add_argument('--logging', dest='logging',
+                        help='logging file')
+    parser.add_argument('--daemon', dest='daemon', action='store_true',
+                        help='daemon')
+    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
+                        help='debug info')
     args = parser.parse_args()
 
-    loglevel = logging.WARN
-    if args.verbose:
-        loglevel = logging.INFO
-
-    formatter = '%(asctime)s:%(levelname)s:%(threadName)s:%(name)s:%(message)s'
     if args.daemon:
-        logging.warn('BUG, do not enable daemon parameter.')
+        sys.argv.remove('--daemon')
+        os.spawnvpe(os.P_NOWAIT, sys.argv[0], sys.argv, os.environ)
         sys.exit()
 
-        daemon = True
-        logfile = '/tmp/oxfs.log'
-        if args.logging:
-            logfile = logging
+    logging_level = logging.WARN
+    if args.verbose:
+        logging_level  = logging.INFO
 
-        logging.basicConfig(level=loglevel, format=formatter, filename=logfile)
+    formatter = '%(asctime)s:%(levelname)s:%(threadName)s:%(name)s:%(message)s'
+    if args.logging:
+        logging.basicConfig(level=logging_level,
+                            format=formatter,
+                            filename=args.logging)
     else:
-        daemon = False
-        logging.basicConfig(level=loglevel, format=formatter)
+        logging.basicConfig(level=logging_level,
+                            format=formatter)
 
     if not args.host:
         parser.print_help()
@@ -383,12 +403,7 @@ def main():
                 cache_path=args.cache_path,
                 remote_path=remote_path, port=ssh_port)
     oxfs.start_apiserver(apiserver_port)
-    if daemon:
-        # bugly, hangs
-        # oxfs.fuse_main(args.mount_point, False)
-        sys.exit()
-    else:
-        oxfs.fuse_main(args.mount_point, True)
+    oxfs.fuse_main(args.mount_point)
 
 if __name__ == '__main__':
     main()

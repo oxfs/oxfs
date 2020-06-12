@@ -3,7 +3,7 @@
 import threading
 import os, json, shutil
 from flask import Flask, request
-from flask_restplus import Resource, Api, fields
+from flask_restx import Resource, Api, fields
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 class OxfsApi(object):

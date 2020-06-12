@@ -12,50 +12,60 @@ Oxfs is a user-space network file system similar to SSHFS, and the underlying da
 
 ### Get Started
 
-#### Ubuntu
+#### Ubuntu/Debian
 
 ```bash
-$ # Setup
 $ sudo apt-get install python3.7
 $ python3.7 -m pip install oxfs --user
-
-$ # Run Oxfs
-$ mkdir remote
-$ sudo oxfs -s user@xxx.xxx.xxx.xxx -m remote -r /home/oxfs -c /tmp/oxfs
 ```
 
-#### Darwin
+#### macOS
 
 ```bash
-$ # Setup
 $ brew install python3
 $ mkdir ~/.venv
 $ python3 -m venv ~/.venv/oxfs
 $ source ~/.venv/oxfs/bin/activate
 $ pip install oxfs
-
-$ # Run Oxfs
-$ mkdir remote
-$ sudo oxfs -s user@xxx.xxx.xxx.xxx -m remote -r /home/oxfs -c /tmp/oxfs
 ```
 
-#### Parameters
+### Mount
 
 ```bash
-$ oxfs --help
-usage: oxfs [-h] [-s HOST] [-p PORT] [-m MOUNT_POINT] [-r REMOTE_PATH]
-            [-c CACHE_PATH] [-l LOGGING] [-d] [-v]
+$ oxfs --host mark@x.x.x.x --remote-path /home/mark --mount-point mark --cache-path ~/.oxfs --logging /tmp/oxfs.log --daemon
+$ cd mark
+```
+
+### Exit
+
+```bash
+$ umount mark
+```
+
+### More
+
+```bash
+$ oxfs
+usage: oxfs [-h] [--host HOST] [--ssh-port SSH_PORT]
+            [--apiserver-port APISERVER_PORT] [--mount-point MOUNT_POINT]
+            [--remote-path REMOTE_PATH] [--cache-path CACHE_PATH]
+            [--logging LOGGING] [--daemon] [-v]
 
 optional arguments:
   -h, --help            show this help message and exit
-  -s HOST, --host HOST  ssh host (for example: root@127.0.0.1)
-  -p PORT, --port PORT  oxfs apiserver port, default: 10010)
-  -m MOUNT_POINT, --mount_point MOUNT_POINT mount point
-  -r REMOTE_PATH, --remote_path REMOTE_PATH remote path, default: /
-  -c CACHE_PATH, --cache_path CACHE_PATH oxfs files cache path
-  -l LOGGING, --logging LOGGING set log file, default: /tmp/oxfs.log
-  -d, --daemon          run in background
-  -v, --verbose         print verbose info
+  --host HOST           ssh host (example: root@127.0.0.1)
+  --ssh-port SSH_PORT   ssh port (defaut: 22)
+  --apiserver-port APISERVER_PORT
+                        apiserver port (default: 10010)
+  --mount-point MOUNT_POINT
+                        mount point
+  --remote-path REMOTE_PATH
+                        remote path (default: /)
+  --cache-path CACHE_PATH
+                        cache path
+  --logging LOGGING     logging file
+  --daemon              daemon
+  -v, --verbose         debug info
 ```
 
 ### Performance
@@ -78,21 +88,27 @@ $ iozone -R -b output.xls -p -c -r 1k -s 20m -l 1 -u 1
 
 ![](benchmark/oxfs-vs-sshfs.png)
 
-- Sshfs performance (default parameters).
-  - Sshfs enable the kernel cache by default, that's why re-read is deadly fast.
+- Sshfs performance
+  - Sshfs enable the kernel cache by default, that's why re-read so fast.
 
 ![](benchmark/sshfs.png)
 
-- Oxfs performance (default parameters).
-  - Oxfs just enable the fuse auto_cache flag.
+- Oxfs performance
+  - Oxfs enable the fuse auto_cache.
 
 ![](benchmark/oxfs.png)
 
 ### Changelog
 
+- release/0.2.1
+  - [New] Add daemon support.
+  - [New] Upgrade to flask-restx.
+  - [Removed] Remove short argument.
+  - [Fixed] Fix bugs with git operations.
+  - [Fixed] Fix empty file write failed bug.
+  - [Fixed] Fix mount permission issue.
 - release/0.2.0
-  - [New] Add restful API to refresh the cache, default: http://127.0.0.1:10010 .
-
+  - [New] Add restful API to refresh the cache.
 - release/0.1.2
   - [Removed] Remove auto_unmount fuse parameter, some osxfuse do not support it.
   - [Deprecated] Disable the daemon parameter, turn on it in the future.
