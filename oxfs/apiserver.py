@@ -43,6 +43,11 @@ class OxfsApi(object):
         self.thread.daemon = True
         self.thread.start()
 
+    def set_flask_env(self):
+        name = 'FLASK_ENV'
+        if name not in os.environ:
+            os.environ[name] = 'development'
+
     def start_service(self, port):
         apiserver = self
         self.app = Flask(__name__)
@@ -91,4 +96,5 @@ class OxfsApi(object):
                 status, data = apiserver.fetchd(path)
                 return {'status': status, 'data': data}
 
-        self.app.run(port=port)
+        self.set_flask_env()
+        self.app.run(port=port, debug=False)
