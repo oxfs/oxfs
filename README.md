@@ -18,7 +18,7 @@ Oxfs is a user-space network file system similar to SSHFS, and the underlying da
 
 - Ubuntu/Debian
 
-```
+```sh
 $ sudo apt-get install fuse
 $ sudo apt-get install python3.7
 $ python3.7 -m pip install oxfs --user
@@ -27,7 +27,7 @@ $ python3.7 -m pip install oxfs --user
 - MacOS
   - Please install osxfuse firstly. [links](https://github.com/osxfuse/osxfuse/releases)
 
-```
+```sh
 $ brew install python3
 $ mkdir ~/.venv
 $ python3 -m venv ~/.venv/oxfs
@@ -39,7 +39,7 @@ $ pip install oxfs
 
 - Please put your ssh public key to target server's `~/.ssh/authorized_keys`
 
-```
+```sh
 # mount
 $ oxfs --host mark@x.x.x.x --remote-path /home/mark --mount-point mark --cache-path ~/.oxfs --logging /tmp/oxfs.log --daemon
 
@@ -52,7 +52,7 @@ $ umount mark
 
 ### Help
 
-```
+```sh
 $ oxfs -h
 usage: oxfs [-h] [--host HOST] [--ssh-port SSH_PORT]
             [--apiserver-port APISERVER_PORT] [--mount-point MOUNT_POINT]
