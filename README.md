@@ -1,6 +1,4 @@
-## Oxfs
-
-<p>
+<p align="center">
 <img alt="GitHub" src="https://img.shields.io/github/license/RainMark/oxfs">
 <img alt="PyPI" src="https://img.shields.io/pypi/v/oxfs">
 <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/oxfs">
@@ -10,18 +8,26 @@
 
 Oxfs is a user-space network file system similar to SSHFS, and the underlying data transfer is based on the SFTP protocol. Oxfs introduces an asynchronous refresh policy to solve the jamming problem caused by the mismatch between network speed and user operation file speed. When Oxfs writes a file, it first writes to the local cache file and submits an asynchronous update task to update the content to the remote host. Similarly, when reading a file, it is preferred to read from a local cache file. Oxfs's data cache eventually falls to disk, and even if it is remounted, the history cache can still be used.
 
-### Get Started
+![](files/mount.gif)
+![](files/operations.gif)
+![](files/umount.gif)
 
-#### Ubuntu/Debian
+## Get Started
 
-```bash
+### Install
+
+- Ubuntu/Debian
+
+```
+$ sudo apt-get install fuse
 $ sudo apt-get install python3.7
 $ python3.7 -m pip install oxfs --user
 ```
 
-#### macOS
+- MacOS
+  - Please install osxfuse firstly. [links](https://github.com/osxfuse/osxfuse/releases)
 
-```bash
+```
 $ brew install python3
 $ mkdir ~/.venv
 $ python3 -m venv ~/.venv/oxfs
@@ -29,23 +35,25 @@ $ source ~/.venv/oxfs/bin/activate
 $ pip install oxfs
 ```
 
-### Mount
+### Usage
 
-```bash
-$ oxfs --host mark@x.x.x.x --remote-path /home/mark --mount-point mark --cache-path ~/.oxfs --logging /tmp/oxfs.log --daemon
-$ cd mark
+- Please put your ssh public key to target server's `~/.ssh/authorized_keys`
+
 ```
+# mount
+$ oxfs --host mark@x.x.x.x --remote-path /home/mark --mount-point mark --cache-path ~/.oxfs --logging /tmp/oxfs.log --daemon
 
-### Exit
+# browse & edit
+$ cd mark
 
-```bash
+# umount
 $ umount mark
 ```
 
-### More
+### Help
 
-```bash
-$ oxfs
+```
+$ oxfs -h
 usage: oxfs [-h] [--host HOST] [--ssh-port SSH_PORT]
             [--apiserver-port APISERVER_PORT] [--mount-point MOUNT_POINT]
             [--remote-path REMOTE_PATH] [--cache-path CACHE_PATH]
@@ -68,37 +76,17 @@ optional arguments:
   -v, --verbose         debug info
 ```
 
-### Performance
+## Benchmark
 
-#### Environment
-
-- Ping Latency: 190 ms
 - VPS: BandwagonHost (SPECIAL 10G KVM PROMO V3 - LOS ANGELES - CN2)
 - VPS Operating System: Centos 7 x86_64 bbr
 - Host: Intel® Core™ i5-4210U CPU @ 1.70GHz × 4 , SSD 125.5 GB
 - Host Operating System: Ubuntu 18.04.2 LTS x86_64 reno
+- Network Bandwidth: 4Mbps
 
-####  Method
+![](files/oxfs-vs-sshfs.png)
 
-```bash
-$ iozone -R -b output.xls -p -c -r 1k -s 20m -l 1 -u 1
-```
-
-- Oxfs vs Sshfs
-
-![](benchmark/oxfs-vs-sshfs.png)
-
-- Sshfs performance
-  - Sshfs enable the kernel cache by default, that's why re-read so fast.
-
-![](benchmark/sshfs.png)
-
-- Oxfs performance
-  - Oxfs enable the fuse auto_cache.
-
-![](benchmark/oxfs.png)
-
-### Changelog
+## Changelog
 
 - release/0.3.0
   - [New] Add daemon support.
