@@ -1,4 +1,8 @@
 <p align="center">
+<h1 align="center">oxfs</h2>
+<h6 align="center">A dead simple, fast SFTP file system</h2>
+</p>
+<p align="center">
 <img alt="GitHub" src="https://img.shields.io/github/license/RainMark/oxfs">
 <img alt="PyPI" src="https://img.shields.io/pypi/v/oxfs">
 <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/oxfs">
