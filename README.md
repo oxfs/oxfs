@@ -1,5 +1,5 @@
 <p align="center">
-<h1 align="center">oxfs</h2>
+<h1 align="center" margin-bottom="0px" margin-top="0px">oxfs</h2>
 <h6 align="center">A dead simple, fast SFTP file system</h2>
 </p>
 <p align="center">
