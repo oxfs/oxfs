@@ -3,11 +3,11 @@
 <h6 align="center">A dead simple, fast SFTP file system</h2>
 </p>
 <p align="center">
-<img alt="GitHub" src="https://img.shields.io/github/license/RainMark/oxfs">
 <img alt="PyPI" src="https://img.shields.io/pypi/v/oxfs">
 <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/oxfs">
 <img alt="PyPI - Wheel" src="https://img.shields.io/pypi/wheel/oxfs">
 <img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/RainMark/oxfs">
+<img alt="GitHub" src="https://img.shields.io/github/license/RainMark/oxfs">
 </p>
 
 Oxfs is a user-space network file system similar to SSHFS, and the underlying data transfer is based on the SFTP protocol. Oxfs introduces an asynchronous refresh policy to solve the jamming problem caused by the mismatch between network speed and user operation file speed. When Oxfs writes a file, it first writes to the local cache file and submits an asynchronous update task to update the content to the remote host. Similarly, when reading a file, it is preferred to read from a local cache file. Oxfs's data cache eventually falls to disk, and even if it is remounted, the history cache can still be used.
