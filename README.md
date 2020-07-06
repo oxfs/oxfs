@@ -1,6 +1,6 @@
 <p align="center">
-<h1 align="center">oxfs</h2>
-<h6 align="center">A dead simple, fast SFTP file system</h2>
+<h1 align="center">oxfs</h1>
+<h6 align="center">A dead simple, fast SFTP file system</h6>
 </p>
 <p align="center">
 <img alt="PyPI" src="https://img.shields.io/pypi/v/oxfs">
