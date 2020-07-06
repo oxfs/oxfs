@@ -26,6 +26,7 @@ class TaskExecutor(object):
         self.local_data = dict()
         self.queue = Queue()
         self.empty = threading.Event()
+        self.empty.set()
         self.running = True
         self.thread = threading.Thread(target=self.loop, args=())
         self.thread.start()

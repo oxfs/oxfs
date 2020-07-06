@@ -82,9 +82,6 @@ class OXFS(LoggingMixIn, Operations):
     def remotepath(self, path):
         return os.path.normpath(os.path.join(self.remote_path, path[1:]))
 
-    def localpath(self, path):
-        return path[len(self.remote_path):]
-
     @synchronized
     def trylock(self, path):
         lockfile = self.cachefile(path) + '.lockfile'
@@ -208,7 +205,7 @@ class OXFS(LoggingMixIn, Operations):
         self.logger.info('rename {} {}'.format(old, new))
         self.taskpool.wait(xxhash.xxh64(old).intdigest())
         try:
-            self.unlink(self.localpath(new))
+            self.unlink(new)
         except Exception as e:
             self.logger.debug(e)
 
@@ -249,7 +246,9 @@ class OXFS(LoggingMixIn, Operations):
             if self.empty_file(realpath):
                 self.create(path, 'wb')
             else:
-                raise FuseOSError(ENOENT)
+                task = Task(xxhash.xxh64(realpath).intdigest(), self.getfile, realpath)
+                self.taskpool.submit(task)
+                self.taskpool.wait(xxhash.xxh64(realpath).intdigest())
 
         status = os.truncate(cachefile, length)
         self.logger.info(self.extract(os.lstat(cachefile)))
@@ -297,7 +296,9 @@ class OXFS(LoggingMixIn, Operations):
             if self.empty_file(realpath):
                 self.create(path, 'wb')
             else:
-                raise FuseOSError(ENOENT)
+                task = Task(xxhash.xxh64(realpath).intdigest(), self.getfile, realpath)
+                self.taskpool.submit(task)
+                self.taskpool.wait(xxhash.xxh64(realpath).intdigest())
 
         with open(cachefile, 'rb+') as outfile:
             outfile.seek(offset, 0)
