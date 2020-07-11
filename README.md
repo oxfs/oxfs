@@ -25,7 +25,7 @@ Oxfs is a user-space network file system similar to SSHFS, and the underlying da
 ```sh
 $ sudo apt-get install fuse
 $ sudo apt-get install python3.7
-$ python3.7 -m pip install oxfs --user
+$ python3.7 -m pip install oxfs
 ```
 
 - MacOS
@@ -92,6 +92,8 @@ optional arguments:
 
 ## Changelog
 
+- release/0.3.1
+  - [Fixed] Fix no such file error when write occurred before read.
 - release/0.3.0
   - [New] Add daemon support.
   - [New] Upgrade to flask-restx.
@@ -104,9 +106,7 @@ optional arguments:
 - release/0.1.2
   - [Removed] Remove auto_unmount fuse parameter, some osxfuse do not support it.
   - [Deprecated] Disable the daemon parameter, turn on it in the future.
-
 - release/0.1.1
   - [Added] enable the auto_cache by default.
-
 - release/0.1.0
   - [Fixed] Fix the multi-thread bugs for rename operation.
