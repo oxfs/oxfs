@@ -1,19 +1,24 @@
 #!/usr/bin/env python
 
-import os, sys
-import logging
 import argparse
-import xxhash
+import base64
+import getpass
+import logging
+import multiprocessing
+import os
 import paramiko
-import threading
 import platform
+import subprocess
+import sys
+import threading
+import xxhash
 
 from errno import ENOENT
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
+from oxfs.apiserver import OxfsApi
 from oxfs.cache import MemoryCache
 from oxfs.task_executor import TaskExecutorService, Task
-from oxfs.apiserver import OxfsApi
 
 def synchronized(func):
     func.__lock__ = threading.Lock()
@@ -23,38 +28,69 @@ def synchronized(func):
 
     return synced_func
 
-class OXFS(LoggingMixIn, Operations):
+class Oxfs(LoggingMixIn, Operations):
     '''
     A dead simple, fast SFTP file system. Home: https://oxfs.io/
 
     You need to be able to login to remote host without entering a password.
     '''
 
-    def __init__(self, host, user, cache_path, remote_path, port=22):
+    def __init__(self, host, user, cache_path, remote_path, port=22, password=None):
         self.logger = logging.getLogger('oxfs')
         self.sys = platform.system()
         self.host = host
         self.port = port
         self.user = user
+        self.password = password
         self.cache_path = cache_path
         self.remote_path = os.path.normpath(remote_path)
         self.client, self.sftp = self.open_sftp()
-        self.taskpool = TaskExecutorService(4)
         self.attributes = MemoryCache(prefix='attributes')
         self.directories = MemoryCache(prefix='directories')
 
         if not os.path.exists(self.cache_path):
             os.makedirs(self.cache_path)
 
+    def start_thread_pool(self):
+        self.taskpool = TaskExecutorService(multiprocessing.cpu_count())
+
     def start_apiserver(self, port):
         self.apiserver = OxfsApi(self)
         self.apiserver.run(port)
+
+    def spawnvpe(self):
+        p = sys.argv
+        if self.password:
+            p.append('--password')
+            p.append(base64.b64encode(self.password.encode()).decode())
+
+        p.remove('--daemon')
+        subprocess.Popen(p, env=os.environ)
+
+    def getpass(self):
+        if self.password:
+            return self.password
+        prompt = '''{}@{}'s password: '''.format(self.user, self.host)
+        self.password = getpass.getpass(prompt)
+        return self.password
 
     def open_sftp(self):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.load_system_host_keys()
-        client.connect(self.host, port=self.port, username=self.user)
+        if not self.password:
+            try:
+                client.connect(self.host, port=self.port, username=self.user)
+                return client, client.open_sftp()
+            except paramiko.ssh_exception.AuthenticationException:
+                self.getpass()
+
+        try:
+            client.connect(self.host, port=self.port, username=self.user, password=self.getpass())
+        except paramiko.ssh_exception.AuthenticationException as e:
+            print('Permission denied.')
+            self.logger.exception(e)
+            sys.exit(1)
         return client, client.open_sftp();
 
     def current_thread_sftp(self, thread_local_data):
@@ -332,10 +368,71 @@ class OXFS(LoggingMixIn, Operations):
             self.logger.error('not supported system, {}'.format(self.sys))
             sys.exit()
 
+class Config:
+    def __init__(self, parser):
+        self.parser = parser
+        self.host = None
+        self.user = None
+        self.mount_point = None
+        self.cache_path = None
+        self.daemon = False
+
+        self.password = None
+        self.ssh_port = 22
+        self.apiserver_port = 10010
+        self.remote_path = '/'
+        self.filename = None
+        self.level = logging.WARN
+        self.fmt = '%(asctime)s:%(levelname)s:%(threadName)s:%(name)s:%(message)s'
+
+    def parse(self):
+        args = self.parser.parse_args()
+        if not args.host:
+            self.parser.print_help()
+            sys.exit()
+        if not args.mount_point:
+            self.parser.print_help()
+            sys.exit()
+        if not args.cache_path:
+            self.parser.print_help()
+            sys.exit()
+
+        if '@' not in args.host:
+            self.parser.print_help()
+            sys.exit()
+
+        self.user, _, self.host = args.host.partition('@')
+        self.cache_path = os.path.abspath(args.cache_path)
+        self.mount_point = os.path.abspath(args.mount_point)
+
+        if args.remote_path:
+            self.remote_path = args.remote_path
+
+        if args.ssh_port:
+            self.ssh_port = args.ssh_port
+
+        if args.password:
+            self.password = base64.b64decode(args.password.encode()).decode()
+
+        if args.apiserver_port:
+            self.apiserver_port = args.apiserver_port
+
+        if args.logging:
+            self.filename = args.logging
+
+        if args.verbose:
+            self.level  = logging.INFO
+
+        if args.daemon:
+            self.daemon = True
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', dest='host',
                         help='ssh host (example: root@127.0.0.1)')
+    parser.add_argument('--password', dest='password',
+                        help=argparse.SUPPRESS)
     parser.add_argument('--ssh-port', dest='ssh_port', type=int,
                         help='ssh port (defaut: 22)')
     parser.add_argument('--apiserver-port', dest='apiserver_port', type=int,
@@ -352,58 +449,28 @@ def main():
                         help='daemon')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                         help='debug info')
-    args = parser.parse_args()
 
-    if args.daemon:
-        sys.argv.remove('--daemon')
-        os.spawnvpe(os.P_NOWAIT, sys.argv[0], sys.argv, os.environ)
+    config = Config(parser)
+    config.parse()
+
+    logging.basicConfig(level=config.level,
+                        format=config.fmt,
+                        filename=config.filename)
+
+    fs = Oxfs(host=config.host,
+              user=config.user,
+              cache_path=config.cache_path,
+              remote_path=config.remote_path,
+              port=config.ssh_port,
+              password=config.password)
+
+    if config.daemon:
+        fs.spawnvpe()
         sys.exit()
 
-    logging_level = logging.WARN
-    if args.verbose:
-        logging_level  = logging.INFO
-
-    formatter = '%(asctime)s:%(levelname)s:%(threadName)s:%(name)s:%(message)s'
-    if args.logging:
-        logging.basicConfig(level=logging_level,
-                            format=formatter,
-                            filename=args.logging)
-    else:
-        logging.basicConfig(level=logging_level,
-                            format=formatter)
-
-    if not args.host:
-        parser.print_help()
-        sys.exit()
-    if not args.mount_point:
-        parser.print_help()
-        sys.exit()
-    if not args.cache_path:
-        parser.print_help()
-        sys.exit()
-
-    ssh_port = 22
-    if args.ssh_port:
-        ssh_port = args.ssh_port
-
-    apiserver_port = 10010
-    if args.apiserver_port:
-        apiserver_port = args.apiserver_port
-
-    if '@' not in args.host:
-        parser.print_help()
-        sys.exit()
-
-    remote_path = '/'
-    if args.remote_path:
-        remote_path = args.remote_path
-
-    user, _, host = args.host.partition('@')
-    oxfs = OXFS(host, user=user,
-                cache_path=args.cache_path,
-                remote_path=remote_path, port=ssh_port)
-    oxfs.start_apiserver(apiserver_port)
-    oxfs.fuse_main(args.mount_point)
+    fs.start_thread_pool()
+    fs.start_apiserver(config.apiserver_port)
+    fs.fuse_main(config.mount_point)
 
 if __name__ == '__main__':
     main()
