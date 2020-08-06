@@ -41,8 +41,6 @@ $ pip install oxfs
 
 ### Usage
 
-- Please put your ssh public key to target server's `~/.ssh/authorized_keys`
-
 ```sh
 # mount
 $ oxfs --host mark@x.x.x.x --remote-path /home/mark --mount-point mark --cache-path ~/.oxfs --logging /tmp/oxfs.log --daemon
@@ -92,6 +90,9 @@ optional arguments:
 
 ## Changelog
 
+- release/0.3.2
+  - [New] Add user/password auth support.
+  - [Improved] Add Config class, use subprocess.Popen.
 - release/0.3.1
   - [Fixed] Fix no such file error when write occurred before read.
 - release/0.3.0
