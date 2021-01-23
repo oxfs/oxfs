@@ -18,7 +18,7 @@ setup(
     description='A Fast SFTP File System',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/RainMark/oxfs',
+    url='https://github.com/oxfs/oxfs',
     classifiers=[
         'Operating System :: Unix',
         'Operating System :: MacOS',
