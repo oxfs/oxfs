@@ -43,7 +43,7 @@ $ pip install oxfs
 
 ```sh
 # mount
-$ oxfs --host mark@x.x.x.x --remote-path /home/mark --mount-point mark --cache-path ~/.oxfs --logging /tmp/oxfs.log --daemon
+$ oxfs --host mark@x.x.x.x --remote-path /home/mark --mount-point mark --cache-path ~/.oxfs --logging /tmp/oxfs.log --daemon --auto-cache
 
 # browse & edit
 $ cd mark
@@ -57,9 +57,10 @@ $ umount mark
 ```sh
 $ oxfs -h
 usage: oxfs [-h] [--host HOST] [--ssh-port SSH_PORT]
-            [--apiserver-port APISERVER_PORT] [--mount-point MOUNT_POINT]
+            [--apiserver-port APISERVER_PORT] [--cache-timeout CACHE_TIMEOUT]
+            [--parallel PARALLEL] [--mount-point MOUNT_POINT]
             [--remote-path REMOTE_PATH] [--cache-path CACHE_PATH]
-            [--logging LOGGING] [--daemon] [-v]
+            [--logging LOGGING] [--daemon] [--auto-cache] [-v]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -67,6 +68,9 @@ optional arguments:
   --ssh-port SSH_PORT   ssh port (defaut: 22)
   --apiserver-port APISERVER_PORT
                         apiserver port (default: 10010)
+  --cache-timeout CACHE_TIMEOUT
+                        cache timeout (default: 30s)
+  --parallel PARALLEL   parallel (default: equal to cpu count)
   --mount-point MOUNT_POINT
                         mount point
   --remote-path REMOTE_PATH
@@ -75,6 +79,7 @@ optional arguments:
                         cache path
   --logging LOGGING     logging file
   --daemon              daemon
+  --auto-cache          auto update cache
   -v, --verbose         debug info
 ```
 
