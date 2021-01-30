@@ -22,13 +22,14 @@ class Task(object):
 
 
 class TaskExecutor(object):
-    def __init__(self):
+    def __init__(self, idx):
         self.local_data = dict()
         self.queue = Queue()
         self.empty = threading.Event()
         self.empty.set()
         self.running = True
         self.thread = threading.Thread(target=self.loop, args=())
+        self.thread.name = 'worker-{}'.format(idx)
         self.thread.start()
 
     def submit(self, task):
@@ -65,7 +66,7 @@ class TaskExecutorService(object):
         self.max_workers = max_workers
         self.workers = []
         for i in range(0, self.max_workers):
-            self.workers.append(TaskExecutor())
+            self.workers.append(TaskExecutor(i))
 
     def submit(self, task):
         worker = self.workers[task.taskid % self.max_workers]

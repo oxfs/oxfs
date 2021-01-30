@@ -41,6 +41,7 @@ class OxfsApi(object):
     def run(self, port):
         self.thread = threading.Thread(target=self.start_service, args=(port,))
         self.thread.daemon = True
+        self.thread.name = 'apiserver'
         self.thread.start()
 
     def set_flask_env(self):

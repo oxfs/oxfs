@@ -19,6 +19,7 @@ from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 from oxfs.apiserver import OxfsApi
 from oxfs.cache import MemoryCache
 from oxfs.task_executor import TaskExecutorService, Task
+from oxfs.updater import CacheUpdater
 
 def synchronized(func):
     func.__lock__ = threading.Lock()
@@ -51,12 +52,17 @@ class Oxfs(LoggingMixIn, Operations):
         if not os.path.exists(self.cache_path):
             os.makedirs(self.cache_path)
 
-    def start_thread_pool(self):
-        self.taskpool = TaskExecutorService(multiprocessing.cpu_count())
+    def start_thread_pool(self, parallel):
+        self.taskpool = TaskExecutorService(parallel)
 
     def start_apiserver(self, port):
         self.apiserver = OxfsApi(self)
         self.apiserver.run(port)
+
+    def start_cache_updater(self, config):
+        self.updater = CacheUpdater(self, config.cache_timeout)
+        if config.auto_cache:
+            self.updater.run()
 
     def spawnvpe(self):
         p = sys.argv
@@ -347,6 +353,7 @@ class Oxfs(LoggingMixIn, Operations):
         return len(data)
 
     def destroy(self, path):
+        self.updater.shutdown()
         self.taskpool.shutdown()
         self.sftp.close()
         self.client.close()
@@ -377,14 +384,17 @@ class Config:
         self.mount_point = None
         self.cache_path = None
         self.daemon = False
+        self.auto_cache = False
 
         self.password = None
         self.ssh_port = 22
         self.apiserver_port = 10010
+        self.cache_timeout = 30
+        self.parallel = multiprocessing.cpu_count()
         self.remote_path = '/'
         self.filename = None
         self.level = logging.WARN
-        self.fmt = '%(asctime)s:%(levelname)s:%(threadName)s:%(name)s:%(message)s'
+        self.fmt = '[%(asctime)s][%(levelname)s][%(filename)s -- %(funcName)s():%(lineno)s][%(message)s]'
 
     def parse(self):
         args = self.parser.parse_args()
@@ -418,8 +428,17 @@ class Config:
         if args.apiserver_port:
             self.apiserver_port = args.apiserver_port
 
+        if args.cache_timeout:
+            self.cache_timeout = args.cache_timeout
+
+        if args.parallel:
+            self.parallel = args.parallel
+
         if args.logging:
             self.filename = args.logging
+
+        if args.auto_cache:
+            self.auto_cache = True
 
         if args.verbose:
             self.level  = logging.INFO
@@ -438,6 +457,10 @@ def main():
                         help='ssh port (defaut: 22)')
     parser.add_argument('--apiserver-port', dest='apiserver_port', type=int,
                         help='apiserver port (default: 10010)')
+    parser.add_argument('--cache-timeout', dest='cache_timeout', type=int,
+                        help='cache timeout (default: 30s)')
+    parser.add_argument('--parallel', dest='parallel', type=int,
+                        help='parallel (default: equal to cpu count)')
     parser.add_argument('--mount-point', dest='mount_point',
                         help='mount point')
     parser.add_argument('--remote-path', dest='remote_path',
@@ -448,6 +471,8 @@ def main():
                         help='logging file')
     parser.add_argument('--daemon', dest='daemon', action='store_true',
                         help='daemon')
+    parser.add_argument('--auto-cache', dest='auto_cache', action='store_true',
+                        help='auto update cache')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                         help='debug info')
 
@@ -469,8 +494,9 @@ def main():
         fs.spawnvpe()
         sys.exit()
 
-    fs.start_thread_pool()
+    fs.start_thread_pool(config.parallel)
     fs.start_apiserver(config.apiserver_port)
+    fs.start_cache_updater(config)
     fs.fuse_main(config.mount_point)
 
 if __name__ == '__main__':
