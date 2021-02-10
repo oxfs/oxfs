@@ -95,6 +95,8 @@ optional arguments:
 
 ## Changelog
 
+- release/0.4.0
+  - [New] Add auto-cache policy to sync file automately.
 - release/0.3.2
   - [New] Add user/password auth support.
   - [Improved] Add Config class, use subprocess.Popen.
