@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
+import hashlib
 import logging
 import os
+import pathlib
 import sys
 import threading
 import time
@@ -46,6 +48,42 @@ class CacheUpdater:
             return True
         return False
 
+    # 1. size check
+    # 2. modify time check
+    # 3. md5sum check
+    def can_skip_update(self, path, local, remote):
+        self.logger.info(str(path))
+        self.logger.info(str(local))
+        self.logger.info(str(remote))
+        if local == ENOENT or remote == ENOENT:
+            self.unlink(path)
+            return True
+
+        if local['st_size'] != remote['st_size']:
+            return False
+
+        if local['st_mtime'] >= remote['st_mtime']:
+            return True
+
+        cachefile = self.fs.cachefile(path)
+        if not os.path.exists(cachefile):
+            return True
+
+        # skip md5sum check for small files (<1k)
+        # if remote['st_size'] < 1024:
+        #     return False
+
+        local_md5sum = hashlib.md5(pathlib.Path(cachefile).read_bytes()).hexdigest()
+        stdin, stdout, stderr = self.client.exec_command('md5sum {}'.format(path))
+        remote_md5sum = stdout.read().decode('utf-8').split(' ')[0]
+        stdin.close(), stdout.close(), stderr.close()
+        self.logger.info(local_md5sum)
+        self.logger.info(remote_md5sum)
+        if local_md5sum == remote_md5sum:
+            return True
+
+        return False
+
     def update_attributes(self):
         cache = self.attributes.cache.copy()
         for path, value in cache.items():
@@ -58,7 +96,8 @@ class CacheUpdater:
 
             if value != attr:
                 self.attributes.insert(path, attr)
-                if self.unlink(path):
+                if not self.can_skip_update(path, value, attr):
+                    self.unlink(path)
                     task = Task(xxhash.xxh64(path).intdigest(), self.fs.getfile, path)
                     self.taskpool.submit(task)
 
