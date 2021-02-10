@@ -70,8 +70,8 @@ class CacheUpdater:
             return True
 
         # skip md5sum check for small files (<1k)
-        # if remote['st_size'] < 1024:
-        #     return False
+        if remote['st_size'] < 1024:
+            return False
 
         local_md5sum = hashlib.md5(pathlib.Path(cachefile).read_bytes()).hexdigest()
         stdin, stdout, stderr = self.client.exec_command('md5sum {}'.format(path))
