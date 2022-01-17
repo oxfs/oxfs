@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import logging
 import os
@@ -7,49 +8,41 @@ import pathlib
 import stat
 import threading
 import time
-import xxhash
 
 from errno import ENOENT
-from oxfs.task_executor import Task
+from oxfs.cache.fs import CacheManager
+from oxfs.lock import FileOpsLock
 
 
 class CacheUpdater:
-    def __init__(self, fs, cache_timeout):
-        self.fs = fs
-        self.att = fs.attributes
-        self.dir = fs.directories
-        self.pool = fs.taskpool
-        self.manager = fs.manager
-        self.timeout = cache_timeout
+    def __init__(self, oxfs, period):
+        self.logger = logging.getLogger(__class__.__name__)
+        self.oxfs = oxfs
+        self.ops: FileOpsLock = oxfs.ops
+        self.pool: ThreadPoolExecutor = oxfs.taskpool
+        self.manager: CacheManager = oxfs.manager
+        self.period = period
         self.running = True
-        self.logger = logging.getLogger('cache_updater')
 
     def run(self):
         self.thread = threading.Thread(target=self.loop, args=())
         self.thread.daemon = True
-        self.thread.name = 'cache_updater'
+        self.thread.name = 'cache-updater'
         self.thread.start()
 
     def shutdown(self):
         self.running = False
 
     def loop(self):
-        self.client, self.sftp = self.fs.open_sftp()
+        self.client, self.sftp = self.oxfs.open_sftp()
         while self.running:
-            self.att_check()
-            self.dir_check()
-            time.sleep(self.timeout)
-
+            time.sleep(self.period)
+            self.renew_lstat()
+            self.renew_listdir()
         self.sftp.close()
         self.client.close()
 
-    # 1. size check
-    # 2. modify time check
-    # 3. md5sum check
-    def can_skip(self, path, cached, remote):
-        self.logger.info(str(path))
-        self.logger.info(str(cached))
-        self.logger.info(str(remote))
+    def skip_syncfile(self, path, cached, remote):
         cachefile = self.manager.cachefile(path)
         if cached == ENOENT or remote == ENOENT:
             self.manager.pop(cachefile)
@@ -61,12 +54,15 @@ class CacheUpdater:
         if cached['st_size'] != remote['st_size']:
             return False
 
-        cached_md5sum = hashlib.md5(pathlib.Path(
-            cachefile).read_bytes()).hexdigest()
+        if os.lstat(cachefile).st_size != remote['st_size']:
+            return False
+
         stdin, stdout, stderr = self.client.exec_command(
             'md5sum {}'.format(path))
         remote_md5sum = stdout.read().decode('utf-8').split(' ')[0]
         stdin.close(), stdout.close(), stderr.close()
+        cached_md5sum = hashlib.md5(pathlib.Path(
+            cachefile).read_bytes()).hexdigest()
         self.logger.info(cached_md5sum)
         self.logger.info(remote_md5sum)
         if cached_md5sum == remote_md5sum:
@@ -74,36 +70,40 @@ class CacheUpdater:
 
         return False
 
-    def att_check(self):
-        cache = self.att.copy()
+    def renew_lstat(self):
+        attributes = self.oxfs.attributes
+        cache = attributes.copy()
         for path, value in cache.items():
-            att = ENOENT
+            if not self.ops.trylock(path):
+                continue
+            attr = ENOENT
             try:
-                att = self.fs.extract(self.sftp.lstat(path))
+                attr = self.oxfs.extract(self.sftp.lstat(path))
             except Exception as e:
-                self.logger.info(e)
+                self.logger.debug(e)
 
             if type(value) == dict and stat.S_ISDIR(value['st_mode']):
-                self.att.put(path, att)
+                attributes.put(path, attr)
+                self.ops.unlock(path)
                 continue
 
-            if value != att:
+            if value != attr:
                 self.logger.info(path)
-                if not self.can_skip(path, value, att):
+                if not self.skip_syncfile(path, value, attr):
                     self.manager.pop(self.manager.cachefile(path))
-                    self.att.put(path, att)
-                    task = Task(xxhash.xxh64(path).intdigest(),
-                                self.fs.getfile, path)
-                    self.pool.submit(task)
+                    attributes.put(path, attr)
+                    self.pool.submit(self.oxfs._getfile, path)
 
-    def dir_check(self):
-        cache = self.dir.copy()
+            self.ops.unlock(path)
+
+    def renew_listdir(self):
+        directories = self.oxfs.directories
+        cache = directories.copy()
         for path, value in cache.items():
             entries = None
             try:
                 entries = self.sftp.listdir(path)
                 if sorted(value) != sorted(entries):
-                    self.logger.info(path)
-                    self.dir.put(path, entries)
+                    directories.put(path, entries)
             except Exception as e:
-                self.logger.info(e)
+                self.logger.debug(e)
