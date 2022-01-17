@@ -10,24 +10,17 @@ import paramiko
 import platform
 import subprocess
 import sys
-import threading
 import xxhash
 
 from errno import ENOENT
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
 from oxfs.apiserver import OxfsApi
-from oxfs.cache import MemoryCache
+from oxfs.cache import meta, fs
+from oxfs.cache.meta import synchronized
 from oxfs.task_executor import TaskExecutorService, Task
 from oxfs.updater import CacheUpdater
 
-def synchronized(func):
-    func.__lock__ = threading.Lock()
-    def synced_func(*args, **kws):
-        with func.__lock__:
-            return func(*args, **kws)
-
-    return synced_func
 
 class Oxfs(LoggingMixIn, Operations):
     '''
@@ -46,11 +39,9 @@ class Oxfs(LoggingMixIn, Operations):
         self.cache_path = cache_path
         self.remote_path = os.path.normpath(remote_path)
         self.client, self.sftp = self.open_sftp()
-        self.attributes = MemoryCache(prefix='attributes')
-        self.directories = MemoryCache(prefix='directories')
-
-        if not os.path.exists(self.cache_path):
-            os.makedirs(self.cache_path)
+        self.attributes = meta.LruCache()
+        self.directories = meta.LruCache()
+        self.manager = fs.CacheManager(self.cache_path)
 
     def start_thread_pool(self, parallel):
         self.taskpool = TaskExecutorService(parallel)
@@ -92,12 +83,13 @@ class Oxfs(LoggingMixIn, Operations):
                 self.getpass()
 
         try:
-            client.connect(self.host, port=self.port, username=self.user, password=self.getpass())
+            client.connect(self.host, port=self.port,
+                           username=self.user, password=self.getpass())
         except paramiko.ssh_exception.AuthenticationException as e:
             print('Permission denied.')
             self.logger.exception(e)
             sys.exit(1)
-        return client, client.open_sftp();
+        return client, client.open_sftp()
 
     def current_thread_sftp(self, thread_local_data):
         sftp = thread_local_data.get('sftp')
@@ -118,15 +110,18 @@ class Oxfs(LoggingMixIn, Operations):
             sftp.close()
             client.close()
 
-    def cachefile(self, path):
-        return os.path.join(self.cache_path, xxhash.xxh64_hexdigest(path))
+    def cachefile(self, path, renew=True):
+        key = self.manager.cachefile(path)
+        if renew:
+            self.manager.renew(key)
+        return key
 
     def remotepath(self, path):
         return os.path.normpath(os.path.join(self.remote_path, path[1:]))
 
     @synchronized
     def trylock(self, path):
-        lockfile = self.cachefile(path) + '.lockfile'
+        lockfile = path + '.lock'
         if os.path.exists(lockfile):
             return False
         open(lockfile, 'wb').close()
@@ -134,54 +129,51 @@ class Oxfs(LoggingMixIn, Operations):
 
     @synchronized
     def unlock(self, path):
-        lockfile = self.cachefile(path) + '.lockfile'
+        lockfile = path + '.lock'
         os.remove(lockfile)
 
     def getfile(self, thread_local_data, path):
-        cachefile = self.cachefile(path)
+        cachefile = self.cachefile(path, False)
         if os.path.exists(cachefile):
-            self.logger.info('exists, skip it. {}'.format(path))
             return False
 
-        if not self.trylock(path):
+        sftp = self.current_thread_sftp(thread_local_data)
+        st = sftp.lstat(path)
+        if st.st_size > self.manager.maxsize:
+            return False
+
+        if not self.trylock(cachefile):
             self.logger.info('getfile lock failed {}'.format(path))
             return False
 
         self.logger.info('getfile {}'.format(path))
         tmpfile = cachefile + '.tmpfile'
-        self.current_thread_sftp(thread_local_data).get(path, tmpfile)
+        sftp.get(path, tmpfile)
         os.rename(tmpfile, cachefile)
-        self.unlock(path)
+        self.manager.put(cachefile)
+        self.unlock(cachefile)
         return True
 
     def extract(self, attr):
         return dict((key, getattr(attr, key)) for key in (
             'st_atime', 'st_gid', 'st_mode', 'st_mtime', 'st_size', 'st_uid'))
 
-    def _chmod(self, path, mode):
-        self.logger.info('sftp chmod {}, mode {}'.format(path, mode))
-        return self.sftp.chmod(path, mode)
-
     def chmod(self, path, mode):
         path = self.remotepath(path)
-        cachefile = self.cachefile(path)
-        if os.path.exists(cachefile):
-            os.chmod(self.cachefile(path), mode)
-            self.attributes.insert(path, self.extract(os.lstat(cachefile)))
-            return self._chmod(path, mode)
-        else:
-            status = self._chmod(path, mode)
-            self.attributes.remove(path)
-            return status
+        status = self.sftp.chmod(path, mode)
+        self.attributes.remove(path)
+        return status
 
     def chown(self, path, uid, gid):
         path = self.remotepath(path)
-        return self.sftp.chown(path, uid, gid)
+        status = self.sftp.chown(path, uid, gid)
+        self.attributes.remove(path)
+        return status
 
     def create(self, path, mode):
         path = self.remotepath(path)
         self.logger.info('create {}, ignore mode {}'.format(path, mode))
-        cachefile = self.cachefile(path)
+        cachefile = self.cachefile(path, False)
         open(cachefile, 'wb').close()
         self.sftp.open(path, 'wb').close()
         self.attributes.remove(path)
@@ -190,19 +182,19 @@ class Oxfs(LoggingMixIn, Operations):
 
     def getattr(self, path, fh=None):
         path = self.remotepath(path)
-        attr = self.attributes.fetch(path)
+        attr = self.attributes.get(path)
         if attr is not None:
             if ENOENT == attr:
                 raise FuseOSError(ENOENT)
             return attr
 
-        self.logger.info('sftp getattr {}'.format(path))
         try:
             attr = self.extract(self.sftp.lstat(path))
-            self.attributes.insert(path, attr)
+            self.attributes.put(path, attr)
+            self.logger.info('sftp getattr {}, attr {}'.format(path, attr))
             return attr
         except:
-            self.attributes.insert(path, ENOENT)
+            self.attributes.put(path, ENOENT)
             raise FuseOSError(ENOENT)
 
     def mkdir(self, path, mode):
@@ -213,10 +205,16 @@ class Oxfs(LoggingMixIn, Operations):
         self.directories.remove(os.path.dirname(path))
         return status
 
+    def valid(self, cache, path):
+        try:
+            return os.lstat(cache).st_size == self.attributes.get(path)['st_size']
+        except:
+            return False
+
     def read(self, path, size, offset, fh):
         path = self.remotepath(path)
         cachefile = self.cachefile(path)
-        if os.path.exists(cachefile):
+        if self.valid(cachefile, path):
             with open(cachefile, 'rb') as infile:
                 infile.seek(offset, 0)
                 return infile.read(size)
@@ -229,10 +227,10 @@ class Oxfs(LoggingMixIn, Operations):
 
     def readdir(self, path, fh=None):
         path = self.remotepath(path)
-        entries = self.directories.fetch(path)
+        entries = self.directories.get(path)
         if entries is None:
             entries = self.sftp.listdir(path)
-            self.directories.insert(path, entries)
+            self.directories.put(path, entries)
             self.logger.info('sftp readdir {} = {}'.format(path, entries))
 
         return entries + ['.', '..']
@@ -283,18 +281,14 @@ class Oxfs(LoggingMixIn, Operations):
 
     def truncate(self, path, length, fh=None):
         realpath = self.remotepath(path)
-        cachefile = self.cachefile(realpath)
+        cachefile = self.cachefile(realpath, False)
         if not os.path.exists(cachefile):
-            if self.empty_file(realpath):
-                self.create(path, 'wb')
-            else:
-                task = Task(xxhash.xxh64(realpath).intdigest(), self.getfile, realpath)
-                self.taskpool.submit(task)
-                self.taskpool.wait(xxhash.xxh64(realpath).intdigest())
+            self.sync_getfile(path, cachefile)
 
         status = os.truncate(cachefile, length)
+        self.manager.put(cachefile)
         self.logger.info(self.extract(os.lstat(cachefile)))
-        self.attributes.insert(realpath, self.extract(os.lstat(cachefile)))
+        self.attributes.put(realpath, self.extract(os.lstat(cachefile)))
         task = Task(xxhash.xxh64(realpath).intdigest(),
                     self._truncate, realpath, length)
         self.taskpool.submit(task)
@@ -303,10 +297,7 @@ class Oxfs(LoggingMixIn, Operations):
     def unlink(self, path):
         path = self.remotepath(path)
         self.logger.info('unlink {}'.format(path))
-        cachefile = self.cachefile(path)
-        if os.path.exists(cachefile):
-            os.unlink(cachefile)
-
+        self.manager.pop(self.cachefile(path, False))
         self.sftp.unlink(path)
         self.attributes.remove(path)
         self.directories.remove(os.path.dirname(path))
@@ -327,29 +318,31 @@ class Oxfs(LoggingMixIn, Operations):
 
         return len(data)
 
-    def empty_file(self, path):
-        attr = self.attributes.fetch(path)
-        return 0 == attr['st_size']
+    def sync_getfile(self, path, cachefile):
+        realpath = self.remotepath(path)
+        if self.getattr(path)['st_size'] == 0:
+            self.create(cachefile, 'wb')
+            return
+        task = Task(xxhash.xxh64(realpath).intdigest(),
+                    self.getfile, realpath)
+        self.taskpool.submit(task)
+        self.taskpool.wait(xxhash.xxh64(realpath).intdigest())
 
     def write(self, path, data, offset, fh):
         realpath = self.remotepath(path)
-        cachefile = self.cachefile(realpath)
+        cachefile = self.cachefile(realpath, False)
         if not os.path.exists(cachefile):
-            if self.empty_file(realpath):
-                self.create(path, 'wb')
-            else:
-                task = Task(xxhash.xxh64(realpath).intdigest(), self.getfile, realpath)
-                self.taskpool.submit(task)
-                self.taskpool.wait(xxhash.xxh64(realpath).intdigest())
+            self.sync_getfile(path, cachefile)
 
         with open(cachefile, 'rb+') as outfile:
             outfile.seek(offset, 0)
             outfile.write(data)
 
-        self.attributes.insert(realpath, self.extract(os.lstat(cachefile)))
+        self.attributes.put(realpath, self.extract(os.lstat(cachefile)))
         task = Task(xxhash.xxh64(realpath).intdigest(),
                     self._write, realpath, data, offset)
         self.taskpool.submit(task)
+        self.manager.put(cachefile)
         return len(data)
 
     def destroy(self, path):
@@ -375,6 +368,7 @@ class Oxfs(LoggingMixIn, Operations):
         else:
             self.logger.error('not supported system, {}'.format(self.sys))
             sys.exit()
+
 
 class Config:
     def __init__(self, parser):
@@ -441,7 +435,7 @@ class Config:
             self.auto_cache = True
 
         if args.verbose:
-            self.level  = logging.INFO
+            self.level = logging.INFO
 
         if args.daemon:
             self.daemon = True
@@ -498,6 +492,7 @@ def main():
     fs.start_apiserver(config.apiserver_port)
     fs.start_cache_updater(config)
     fs.fuse_main(config.mount_point)
+
 
 if __name__ == '__main__':
     main()
