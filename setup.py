@@ -12,7 +12,7 @@ Oxfs is a user-space network file system similar to SSHFS, and the underlying da
 
 setup(
     name='oxfs',
-    version='0.4.0',
+    version='0.5.0',
     author='RainMark',
     author_email='rain.by.zhou@gmail.com',
     description='A Fast SFTP File System',
@@ -34,7 +34,6 @@ setup(
         'fusepy == 3.0.1',
         'paramiko >= 2.0.0',
         'xxhash >= 1.3.0',
-        'flask-restx == 0.5.1',
     ],
 
     entry_points={

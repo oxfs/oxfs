@@ -24,8 +24,9 @@ Oxfs is a user-space network file system similar to SSHFS, and the underlying da
 
 ```sh
 $ sudo apt-get install fuse
-$ sudo apt-get install python3.7
-$ python3.7 -m pip install oxfs
+# python >= 3.7
+$ sudo apt-get install python3.8
+$ python3.8 -m pip install oxfs
 ```
 
 - MacOS
@@ -56,18 +57,13 @@ $ umount mark
 
 ```sh
 $ oxfs -h
-usage: oxfs [-h] [--host HOST] [--ssh-port SSH_PORT]
-            [--apiserver-port APISERVER_PORT] [--cache-timeout CACHE_TIMEOUT]
-            [--parallel PARALLEL] [--mount-point MOUNT_POINT]
-            [--remote-path REMOTE_PATH] [--cache-path CACHE_PATH]
-            [--logging LOGGING] [--daemon] [--auto-cache] [-v]
+usage: oxfs [-h] [--host HOST] [--ssh-port SSH_PORT] [--cache-timeout CACHE_TIMEOUT] [--parallel PARALLEL] [--mount-point MOUNT_POINT] [--remote-path REMOTE_PATH]
+            [--cache-path CACHE_PATH] [--logging LOGGING] [--daemon] [--auto-cache] [-v]
 
 optional arguments:
   -h, --help            show this help message and exit
   --host HOST           ssh host (example: root@127.0.0.1)
   --ssh-port SSH_PORT   ssh port (defaut: 22)
-  --apiserver-port APISERVER_PORT
-                        apiserver port (default: 10010)
   --cache-timeout CACHE_TIMEOUT
                         cache timeout (default: 30s)
   --parallel PARALLEL   parallel (default: equal to cpu count)
@@ -95,6 +91,9 @@ optional arguments:
 
 ## Changelog
 
+- release/0.5.0
+  - [Improved] Add cache limit, lru policy.
+  - [Removed] Delete ApiServer.
 - release/0.4.0
   - [New] Add auto-cache policy to sync file automately.
 - release/0.3.2
