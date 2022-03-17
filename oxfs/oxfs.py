@@ -40,7 +40,7 @@ class Oxfs(LoggingMixIn, Operations):
         self.client, self.sftp = self.open_sftp()
         self.attributes = meta.LruCache()
         self.directories = meta.LruCache()
-        self.manager = fs.CacheManager(self.cache_path, max_disk_size_mb=40)
+        self.manager = fs.CacheManager(self.cache_path)
         self.ops = FileOpsLock()
 
     def start_thread_pool(self, parallel):
