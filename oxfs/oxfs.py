@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import argparse
-import base64
 import getpass
 import logging
 import multiprocessing
@@ -20,6 +19,8 @@ from oxfs.cache import meta, fs
 from oxfs.lock import FileOpsLock
 from oxfs.updater import CacheUpdater
 
+BACKGROUND = 'BACKGROUND'
+
 
 class Oxfs(LoggingMixIn, Operations):
     '''
@@ -28,13 +29,14 @@ class Oxfs(LoggingMixIn, Operations):
     You need to be able to login to remote host without entering a password.
     '''
 
-    def __init__(self, host, user, cache_path, remote_path, port=22, password=None):
+    def __init__(self, host, user, cache_path, remote_path, port=22, key_filename=None):
         self.logger = logging.getLogger(__class__.__name__)
         self.sys = platform.system()
         self.host = host
         self.port = port
         self.user = user
-        self.password = password
+        self.password = None
+        self.key_filename = key_filename
         self.cache_path = cache_path
         self.remote_path = os.path.normpath(remote_path)
         self.client, self.sftp = self.open_sftp()
@@ -56,17 +58,19 @@ class Oxfs(LoggingMixIn, Operations):
     def spawnvpe(self):
         a, e = sys.argv, os.environ
         a.remove('--daemon')
-        e.setdefault(Oxfs.__name__, Oxfs.__name__)
+        e.setdefault(BACKGROUND, BACKGROUND)
         # set stderr PIPE to eat getpass warning
-        p = subprocess.Popen(
-            a, env=e, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-        p.stdin.write(self.password.encode())
+        p = subprocess.Popen(args=a, env=e, stdin=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        data = b'\n'
+        if self.password:
+            data = self.password.encode() + data
+        p.stdin.write(data)
 
-    def getpass(self):
+    def getpass(self, prompt):
         if self.password:
             return self.password
-        prompt = '''{}@{}'s password: '''.format(self.user, self.host)
-        if os.environ.get(Oxfs.__name__):
+        if os.environ.get(BACKGROUND):
             # set stdout stream to eat getpass warning
             stream = open(os.devnull, 'w')
             self.password = getpass.getpass(prompt, stream)
@@ -75,25 +79,34 @@ class Oxfs(LoggingMixIn, Operations):
             self.password = getpass.getpass(prompt)
         return self.password
 
+    def try_connect(self, client, password, abort_on_failed):
+        try:
+            # https://stackoverflow.com/questions/70565357/paramiko-authentication-fails-with-agreed-upon-rsa-sha2-512-pubkey-algorithm
+            client.connect(self.host, port=self.port, disabled_algorithms=dict(pubkeys=["rsa-sha2-512", "rsa-sha2-256"]),
+                           username=self.user, password=password, key_filename=self.key_filename)
+            return client.open_sftp()
+        except paramiko.ssh_exception.AuthenticationException as e:
+            if abort_on_failed:
+                print('Permission denied.')
+                self.logger.exception(e)
+                sys.exit(1)
+
     def open_sftp(self):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.load_system_host_keys()
-        if not self.password:
-            try:
-                client.connect(self.host, port=self.port, username=self.user)
-                return client, client.open_sftp()
-            except paramiko.ssh_exception.AuthenticationException:
-                self.getpass()
 
-        try:
-            client.connect(self.host, port=self.port,
-                           username=self.user, password=self.getpass())
-        except paramiko.ssh_exception.AuthenticationException as e:
-            print('Permission denied.')
-            self.logger.exception(e)
-            sys.exit(1)
-        return client, client.open_sftp()
+        if self.key_filename:
+            prompt = '''{}'s password: '''.format(self.key_filename)
+            return client, self.try_connect(client, self.getpass(prompt), True)
+
+        if not self.password:
+            sftp = self.try_connect(client, None, False)
+            if sftp:
+                return client, sftp
+
+        prompt = '''{}@{}'s password: '''.format(self.user, self.host)
+        return client, self.try_connect(client, self.getpass(prompt), True)
 
     def current_thread_sftp(self):
         tid = threading.get_ident()
@@ -353,7 +366,7 @@ class Config:
         self.daemon = False
         self.auto_cache = False
 
-        self.password = None
+        self.key_filename = None
         self.ssh_port = 22
         self.cache_timeout = 30
         self.parallel = multiprocessing.cpu_count() * 4
@@ -388,8 +401,8 @@ class Config:
         if args.ssh_port:
             self.ssh_port = args.ssh_port
 
-        if args.password:
-            self.password = base64.b64decode(args.password.encode()).decode()
+        if args.key_filename:
+            self.key_filename = os.path.expanduser(args.key_filename)
 
         if args.cache_timeout:
             self.cache_timeout = args.cache_timeout
@@ -414,8 +427,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', dest='host',
                         help='ssh host (example: root@127.0.0.1)')
-    parser.add_argument('--password', dest='password',
-                        help=argparse.SUPPRESS)
+    parser.add_argument('--ssh-key', dest='key_filename',
+                        help='ssh key filename')
     parser.add_argument('--ssh-port', dest='ssh_port', type=int,
                         help='ssh port (defaut: 22)')
     parser.add_argument('--cache-timeout', dest='cache_timeout', type=int,
@@ -449,7 +462,7 @@ def main():
               cache_path=config.cache_path,
               remote_path=config.remote_path,
               port=config.ssh_port,
-              password=config.password)
+              key_filename=config.key_filename)
 
     if config.daemon:
         fs.spawnvpe()
