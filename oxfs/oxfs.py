@@ -54,19 +54,25 @@ class Oxfs(LoggingMixIn, Operations):
             self.updater.run()
 
     def spawnvpe(self):
-        p = sys.argv
-        if self.password:
-            p.append('--password')
-            p.append(base64.b64encode(self.password.encode()).decode())
-
-        p.remove('--daemon')
-        subprocess.Popen(p, env=os.environ)
+        a, e = sys.argv, os.environ
+        a.remove('--daemon')
+        e.setdefault(Oxfs.__name__, Oxfs.__name__)
+        # set stderr PIPE to eat getpass warning
+        p = subprocess.Popen(
+            a, env=e, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        p.stdin.write(self.password.encode())
 
     def getpass(self):
         if self.password:
             return self.password
         prompt = '''{}@{}'s password: '''.format(self.user, self.host)
-        self.password = getpass.getpass(prompt)
+        if os.environ.get(Oxfs.__name__):
+            # set stdout stream to eat getpass warning
+            stream = open(os.devnull, 'w')
+            self.password = getpass.getpass(prompt, stream)
+            stream.close()
+        else:
+            self.password = getpass.getpass(prompt)
         return self.password
 
     def open_sftp(self):
