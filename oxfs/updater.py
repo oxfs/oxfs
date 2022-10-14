@@ -11,14 +11,14 @@ import time
 
 from errno import ENOENT
 from oxfs.cache.fs import CacheManager
-from oxfs.lock import FileOpsLock
+from oxfs.lock import Lock as Mutex
 
 
 class CacheUpdater:
     def __init__(self, oxfs, period):
         self.logger = logging.getLogger(__class__.__name__)
         self.oxfs = oxfs
-        self.ops: FileOpsLock = oxfs.ops
+        self.mtx: Mutex = oxfs.mtx
         self.pool: ThreadPoolExecutor = oxfs.taskpool
         self.manager: CacheManager = oxfs.manager
         self.period = period
@@ -74,7 +74,7 @@ class CacheUpdater:
         attributes = self.oxfs.attributes
         cache = attributes.copy()
         for path, value in cache.items():
-            if not self.ops.trylock(path):
+            if not self.mtx.trylock(path):
                 continue
             attr = ENOENT
             try:
@@ -84,7 +84,7 @@ class CacheUpdater:
 
             if type(value) == dict and stat.S_ISDIR(value['st_mode']):
                 attributes.put(path, attr)
-                self.ops.unlock(path)
+                self.mtx.unlock(path)
                 continue
 
             if value != attr:
@@ -94,7 +94,7 @@ class CacheUpdater:
                     attributes.put(path, attr)
                     self.pool.submit(self.oxfs._getfile, path)
 
-            self.ops.unlock(path)
+            self.mtx.unlock(path)
 
     def renew_listdir(self):
         directories = self.oxfs.directories

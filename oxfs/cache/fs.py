@@ -3,9 +3,8 @@
 import collections
 import logging
 import os
+import threading
 import xxhash
-
-from oxfs.cache.meta import synchronized
 
 
 class CacheManager:
@@ -15,6 +14,7 @@ class CacheManager:
         self.maxsize = max_disk_size_mb << 20
         self.size = 0
         self.cache = collections.OrderedDict()  # key: file name, value: file size
+        self.lock = threading.Lock()
         self.initialize()
 
     def initialize(self):
@@ -26,9 +26,9 @@ class CacheManager:
             path = os.path.join(self.cache_path, name)
             self.cache[path] = os.lstat(path).st_size
 
-    @synchronized
     def copy(self):
-        return self.cache.copy();
+        with self.lock:
+            return self.cache.copy()
 
     def unlink(self, path):
         try:
@@ -36,29 +36,32 @@ class CacheManager:
         except:
             pass
 
-    @synchronized
     def pop(self, key):
-        self.cache.pop(key, None)
+        with self.lock:
+            self.cache.pop(key, None)
         self.unlink(key)
 
     def cachefile(self, path):
         return os.path.join(self.cache_path, xxhash.xxh64_hexdigest(path))
 
-    @synchronized
     def renew(self, key):
-        if self.cache.get(key, None) is not None:
-            self.cache.move_to_end(key)
+        with self.lock:
+            if self.cache.get(key, None) is not None:
+                self.cache.move_to_end(key)
 
-    @synchronized
     def put(self, key):
-        old = self.cache.pop(key, None)
-        if old is not None:
-            self.size -= old
-        size = os.lstat(key).st_size
-        self.size += size
-        self.cache[key] = size
-        self.cache.move_to_end(key)
-        while self.size > self.maxsize:
-            k, s = self.cache.popitem(last=False)
-            self.size -= s
-            self.unlink(k)
+        files = []
+        with self.lock:
+            old = self.cache.pop(key, None)
+            if old is not None:
+                self.size -= old
+            size = os.lstat(key).st_size
+            self.size += size
+            self.cache[key] = size
+            self.cache.move_to_end(key)
+            while self.size > self.maxsize:
+                k, s = self.cache.popitem(last=False)
+                self.size -= s
+                files.append(k)
+        for f in files:
+            self.unlink(f)

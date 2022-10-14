@@ -4,9 +4,9 @@ import threading
 import xxhash
 
 
-class FileOpsLock:
-    def __init__(self, max_locks=1024):
-        self.locks = [threading.Lock()] * max_locks
+class Lock:
+    def __init__(self, max_locks=2048):
+        self.locks = [threading.Lock() for _ in range(0, max_locks)]
 
     def lockid(self, path):
         return xxhash.xxh64_intdigest(path) % len(self.locks)
@@ -22,4 +22,3 @@ class FileOpsLock:
 
     def locked(self, path):
         return self.locks[self.lockid(path)].locked()
-
