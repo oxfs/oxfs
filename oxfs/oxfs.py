@@ -86,7 +86,7 @@ class Oxfs(LoggingMixIn, Operations):
             client.connect(self.host, port=self.port, disabled_algorithms=dict(pubkeys=["rsa-sha2-512", "rsa-sha2-256"]),
                            username=self.user, password=password, key_filename=self.key_filename)
             return client.open_sftp()
-        except paramiko.ssh_exception.AuthenticationException as e:
+        except paramiko.ssh_exception.SSHException as e:
             if abort_on_failed:
                 print('Permission denied.')
                 self.logger.exception(e)
