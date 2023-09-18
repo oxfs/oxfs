@@ -346,7 +346,8 @@ class Oxfs(LoggingMixIn, Operations):
                         uid=os.getuid(), gid=os.getgid(),
                         defer_permissions=True, kill_on_unmount=True,
                         noappledouble=True, noapplexattr=True,
-                        nosuid=True, nobrowse=True, volname=self.host)
+                        nosuid=True, nobrowse=True, 
+                        volname=os.path.basename(os.path.normpath(mount_point))
         elif 'Linux' == self.sys:
             fuse = FUSE(self, mount_point, foreground=True, nothreads=True,
                         allow_other=True, auto_cache=True,
