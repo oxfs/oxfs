@@ -9,7 +9,7 @@ class Lock:
         self.locks = [threading.Lock() for _ in range(0, max_locks)]
 
     def lockid(self, path):
-        return xxhash.xxh64_intdigest(path) % len(self.locks)
+        return xxhash.xxh64_intdigest(path.encode('utf-8')) % len(self.locks)
 
     def lock(self, path):
         self.locks[self.lockid(path)].acquire()

@@ -42,7 +42,10 @@ class CacheManager:
         self.unlink(key)
 
     def cachefile(self, path):
-        return os.path.join(self.cache_path, xxhash.xxh64_hexdigest(path))
+        return os.path.join(
+            self.cache_path,
+            xxhash.xxh64_hexdigest(path.encode('utf-8')),
+        )
 
     def renew(self, key):
         with self.lock:
